@@ -994,7 +994,7 @@ INLINE void PRA32_U2_ControlPanel_update_display_buffer(uint32_t loop_counter) {
         s_display_buffer[7][ 1] = '=';
       }
 
-      std::sprintf(buff, "%3u", current_controller_value);
+      std::snprintf(buff, sizeof(buff), "%3u", current_controller_value);
       s_display_buffer[7][ 2] = buff[0];
       s_display_buffer[7][ 3] = buff[1];
       s_display_buffer[7][ 4] = buff[2];
@@ -1033,7 +1033,7 @@ INLINE void PRA32_U2_ControlPanel_update_display_buffer(uint32_t loop_counter) {
         s_display_buffer[7][12] = '=';
       }
 
-      std::sprintf(buff, "%3u", current_controller_value);
+      std::snprintf(buff, sizeof(buff), "%3u", current_controller_value);
       s_display_buffer[7][13] = buff[0];
       s_display_buffer[7][14] = buff[1];
       s_display_buffer[7][15] = buff[2];
@@ -1072,7 +1072,7 @@ INLINE void PRA32_U2_ControlPanel_update_display_buffer(uint32_t loop_counter) {
         s_display_buffer[3][12] = '=';
       }
 
-      std::sprintf(buff, "%3u", current_controller_value);
+      std::snprintf(buff, sizeof(buff), "%3u", current_controller_value);
       s_display_buffer[3][13] = buff[0];
       s_display_buffer[3][14] = buff[1];
       s_display_buffer[3][15] = buff[2];
