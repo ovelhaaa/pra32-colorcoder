@@ -1,0 +1,21 @@
+name: Phase Manual Status
+
+on:
+  workflow_dispatch:
+
+jobs:
+  phase-status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show current migration status
+        run: |
+          echo "Current migration marker file:"
+          cat docs/migration-status/status.md
+
+      - name: Show next-step reminder
+        run: |
+          echo "This workflow does not run Codex automatically."
+          echo "To execute a phase, start a Codex task manually and paste codex/prompts/phase-N.md."
