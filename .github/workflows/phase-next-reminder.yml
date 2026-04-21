@@ -1,0 +1,66 @@
+name: Phase Next Reminder
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - docs/migration-status/status.md
+
+jobs:
+  open-next-phase-issue:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Detect next phase
+        id: detect
+        run: |
+          output="$(./scripts/next_phase_from_status.sh)"
+          echo "$output" >> "$GITHUB_OUTPUT"
+
+      - name: Create or update next-phase kickoff issue
+        if: steps.detect.outputs.NEXT_PHASE != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const phase = '${{ steps.detect.outputs.NEXT_PHASE }}';
+            const title = `Kick off Phase ${phase} Codex task`;
+            const body = [
+              `Phase ${Number(phase) - 1} is marked complete in docs/migration-status/status.md.`,
+              '',
+              'This is a reminder issue. Starting the actual Codex implementation task is still manual.',
+              '',
+              `Next prompt: codex/prompts/phase-${phase}.md`,
+              '',
+              'Suggested steps:',
+              '1. Start a new Codex task.',
+              `2. Paste codex/prompts/phase-${phase}.md.`,
+              '3. Keep scope limited to that phase only.',
+              '4. Open a PR and update docs/migration-status/status.md accordingly.'
+            ].join('\n');
+
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              per_page: 100
+            });
+
+            const existing = issues.find((issue) => issue.title === title);
+            if (existing) {
+              core.info(`Open reminder issue already exists: #${existing.number}`);
+            } else {
+              const created = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body
+              });
+              core.info(`Created reminder issue #${created.data.number}`);
+            }
