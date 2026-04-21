@@ -7,6 +7,8 @@
 #include "pra32-u2-ui-format.h"
 #include "pra32-u2-ui-render-legacy-oled.h"
 #include "pra32-u2-ui-input-legacy.h"
+#include "pra32-u2-ui-input-encoder.h"
+#include "pra32-u2-ui-state-machine.h"
 
 #include "hardware/i2c.h"
 
@@ -52,6 +54,10 @@ extern void handleProgramChange(byte channel, byte number);
 extern uint8_t getCurrentControllerValue(byte channel, byte number);
 extern void getRandUint8Rrray(byte channel, uint8_t array[8]);
 extern void writeParametersToProgram(byte channel, byte number);
+
+static INLINE uint8_t PRA32_U2_ControlPanel_get_target_value(uint8_t target);
+static INLINE void PRA32_U2_ControlPanel_set_target_value(uint8_t target, uint8_t value);
+static INLINE void PRA32_U2_ControlPanel_execute_action_target(uint8_t target);
 
 
 static INLINE void PRA32_U2_ControlPanel_update_page() {
@@ -406,7 +412,7 @@ static INLINE boolean PRA32_U2_ControlPanel_update_control_adc(uint32_t adc_numb
       if (s_adc_control_value[adc_number] <= 32) {
         s_ready_to_read[program_number_to_read] = true;
       } else if (s_ready_to_read[program_number_to_read] && (s_adc_control_value[adc_number] >= 96)) {
-        handleProgramChange(((g_midi_ch + s_current_synth) & 0x0F) + 1, s_adc_control_target[adc_number] - RD_PROGRAM_0);
+        PRA32_U2_ControlPanel_execute_action_target(s_adc_control_target[adc_number]);
         s_ready_to_read[program_number_to_read] = false;
       }
     } else if ((s_adc_control_target[adc_number] >= WR_PROGRAM_0) && (s_adc_control_target[adc_number] <= WR_PROGRAM_15)) {
@@ -415,7 +421,7 @@ static INLINE boolean PRA32_U2_ControlPanel_update_control_adc(uint32_t adc_numb
       if (s_adc_control_value[adc_number] <= 32) {
         s_ready_to_write[program_number_to_write] = true;
       } else if (s_ready_to_write[program_number_to_write] && (s_adc_control_value[adc_number] >= 96)) {
-        writeParametersToProgram(((g_midi_ch + s_current_synth) & 0x0F) + 1, program_number_to_write);
+        PRA32_U2_ControlPanel_execute_action_target(s_adc_control_target[adc_number]);
         s_ready_to_write[program_number_to_write] = false;
       }
     } else if (s_adc_control_target[adc_number] == RD_PANEL_PRMS) {
@@ -423,7 +429,7 @@ static INLINE boolean PRA32_U2_ControlPanel_update_control_adc(uint32_t adc_numb
       if (s_adc_control_value[adc_number] <= 32) {
         s_ready_to_read_panel_prms = true;
       } else if (s_ready_to_read_panel_prms && (s_adc_control_value[adc_number] >= 96)) {
-        handleProgramChange(((g_midi_ch + s_current_synth) & 0x0F) + 1, 128);
+        PRA32_U2_ControlPanel_execute_action_target(s_adc_control_target[adc_number]);
         s_ready_to_read_panel_prms = false;
       }
     } else if (s_adc_control_target[adc_number] == IN_PANEL_PRMS) {
@@ -431,7 +437,7 @@ static INLINE boolean PRA32_U2_ControlPanel_update_control_adc(uint32_t adc_numb
       if (s_adc_control_value[adc_number] <= 32) {
         s_ready_to_init_panel_prms = true;
       } else if (s_ready_to_init_panel_prms && (s_adc_control_value[adc_number] >= 96)) {
-        handleProgramChange(((g_midi_ch + s_current_synth) & 0x0F) + 1, 129);
+        PRA32_U2_ControlPanel_execute_action_target(s_adc_control_target[adc_number]);
         s_ready_to_init_panel_prms = false;
       }
     } else if (s_adc_control_target[adc_number] == WR_PANEL_PRMS) {
@@ -439,7 +445,7 @@ static INLINE boolean PRA32_U2_ControlPanel_update_control_adc(uint32_t adc_numb
       if (s_adc_control_value[adc_number] <= 32) {
         s_ready_to_write_panel_prms = true;
       } else if (s_ready_to_write_panel_prms && (s_adc_control_value[adc_number] >= 96)) {
-        g_synth.write_parameters_to_program(128);
+        PRA32_U2_ControlPanel_execute_action_target(s_adc_control_target[adc_number]);
         s_ready_to_write_panel_prms = false;
       }
     } else if (s_adc_control_target[adc_number] == SEQ_RAND_PITCH) {
@@ -447,17 +453,7 @@ static INLINE boolean PRA32_U2_ControlPanel_update_control_adc(uint32_t adc_numb
       if (s_adc_control_value[adc_number] <= 32) {
         s_ready_to_rand_pitch = true;
       } else if (s_ready_to_rand_pitch && (s_adc_control_value[adc_number] >= 96)) {
-        uint8_t array[8] = {};
-        getRandUint8Rrray(((g_midi_ch + s_current_synth) & 0x0F) + 1, array);
-        g_synth.control_change(SEQ_PITCH_0    , array[0] & 0x7Fu);
-        g_synth.control_change(SEQ_PITCH_1    , array[1] & 0x7Fu);
-        g_synth.control_change(SEQ_PITCH_2    , array[2] & 0x7Fu);
-        g_synth.control_change(SEQ_PITCH_3    , array[3] & 0x7Fu);
-        g_synth.control_change(SEQ_PITCH_4    , array[4] & 0x7Fu);
-        g_synth.control_change(SEQ_PITCH_5    , array[5] & 0x7Fu);
-        g_synth.control_change(SEQ_PITCH_6    , array[6] & 0x7Fu);
-        g_synth.control_change(SEQ_PITCH_7    , array[7] & 0x7Fu);
-
+        PRA32_U2_ControlPanel_execute_action_target(s_adc_control_target[adc_number]);
         s_ready_to_rand_pitch = false;
       }
     } else if (s_adc_control_target[adc_number] == SEQ_RAND_VELO) {
@@ -465,17 +461,7 @@ static INLINE boolean PRA32_U2_ControlPanel_update_control_adc(uint32_t adc_numb
       if (s_adc_control_value[adc_number] <= 32) {
         s_ready_to_rand_velo = true;
       } else if (s_ready_to_rand_velo && (s_adc_control_value[adc_number] >= 96)) {
-        uint8_t array[8] = {};
-        getRandUint8Rrray(((g_midi_ch + s_current_synth) & 0x0F) + 1, array);
-        g_synth.control_change(SEQ_VELO_0     , array[0] & 0x7Fu);
-        g_synth.control_change(SEQ_VELO_1     , array[1] & 0x7Fu);
-        g_synth.control_change(SEQ_VELO_2     , array[2] & 0x7Fu);
-        g_synth.control_change(SEQ_VELO_3     , array[3] & 0x7Fu);
-        g_synth.control_change(SEQ_VELO_4     , array[4] & 0x7Fu);
-        g_synth.control_change(SEQ_VELO_5     , array[5] & 0x7Fu);
-        g_synth.control_change(SEQ_VELO_6     , array[6] & 0x7Fu);
-        g_synth.control_change(SEQ_VELO_7     , array[7] & 0x7Fu);
-
+        PRA32_U2_ControlPanel_execute_action_target(s_adc_control_target[adc_number]);
         s_ready_to_rand_velo = false;
       }
     } else if (s_adc_control_target[adc_number] == PANIC_OP) {
@@ -483,9 +469,7 @@ static INLINE boolean PRA32_U2_ControlPanel_update_control_adc(uint32_t adc_numb
       if (s_adc_control_value[adc_number] <= 32) {
         s_ready_to_panic = true;
       } else if (s_ready_to_panic && (s_adc_control_value[adc_number] >= 96)) {
-        handleControlChange(((g_midi_ch + s_current_synth) & 0x0F) + 1, ALL_SOUND_OFF  , 0);
-        handleControlChange(((g_midi_ch + s_current_synth) & 0x0F) + 1, RESET_ALL_CTRLS, 0);
-
+        PRA32_U2_ControlPanel_execute_action_target(s_adc_control_target[adc_number]);
         s_ready_to_panic = false;
       }
     }
@@ -494,6 +478,64 @@ static INLINE boolean PRA32_U2_ControlPanel_update_control_adc(uint32_t adc_numb
   }
 
   return false;
+}
+
+static INLINE uint8_t PRA32_U2_ControlPanel_get_target_value(uint8_t target) {
+  if (target < 128) {
+    return getCurrentControllerValue(((g_midi_ch + s_current_synth) & 0x0F) + 1, target);
+  }
+  if (target < 128 + 64) {
+    return g_synth.current_controller_value(target);
+  }
+  return 0;
+}
+
+static INLINE void PRA32_U2_ControlPanel_set_target_value(uint8_t target, uint8_t value) {
+  if (target < 128) {
+    handleControlChange(((g_midi_ch + s_current_synth) & 0x0F) + 1, target, value);
+  } else if (target < 128 + 64) {
+    g_synth.control_change(target, value);
+  }
+}
+
+static INLINE void PRA32_U2_ControlPanel_execute_action_target(uint8_t target) {
+  if ((target >= RD_PROGRAM_0) && (target <= RD_PROGRAM_15)) {
+    handleProgramChange(((g_midi_ch + s_current_synth) & 0x0F) + 1, target - RD_PROGRAM_0);
+  } else if ((target >= WR_PROGRAM_0) && (target <= WR_PROGRAM_15)) {
+    uint8_t program_number_to_write = target - WR_PROGRAM_0;
+    writeParametersToProgram(((g_midi_ch + s_current_synth) & 0x0F) + 1, program_number_to_write);
+  } else if (target == RD_PANEL_PRMS) {
+    handleProgramChange(((g_midi_ch + s_current_synth) & 0x0F) + 1, 128);
+  } else if (target == IN_PANEL_PRMS) {
+    handleProgramChange(((g_midi_ch + s_current_synth) & 0x0F) + 1, 129);
+  } else if (target == WR_PANEL_PRMS) {
+    g_synth.write_parameters_to_program(128);
+  } else if (target == SEQ_RAND_PITCH) {
+    uint8_t array[8] = {};
+    getRandUint8Rrray(((g_midi_ch + s_current_synth) & 0x0F) + 1, array);
+    g_synth.control_change(SEQ_PITCH_0    , array[0] & 0x7Fu);
+    g_synth.control_change(SEQ_PITCH_1    , array[1] & 0x7Fu);
+    g_synth.control_change(SEQ_PITCH_2    , array[2] & 0x7Fu);
+    g_synth.control_change(SEQ_PITCH_3    , array[3] & 0x7Fu);
+    g_synth.control_change(SEQ_PITCH_4    , array[4] & 0x7Fu);
+    g_synth.control_change(SEQ_PITCH_5    , array[5] & 0x7Fu);
+    g_synth.control_change(SEQ_PITCH_6    , array[6] & 0x7Fu);
+    g_synth.control_change(SEQ_PITCH_7    , array[7] & 0x7Fu);
+  } else if (target == SEQ_RAND_VELO) {
+    uint8_t array[8] = {};
+    getRandUint8Rrray(((g_midi_ch + s_current_synth) & 0x0F) + 1, array);
+    g_synth.control_change(SEQ_VELO_0     , array[0] & 0x7Fu);
+    g_synth.control_change(SEQ_VELO_1     , array[1] & 0x7Fu);
+    g_synth.control_change(SEQ_VELO_2     , array[2] & 0x7Fu);
+    g_synth.control_change(SEQ_VELO_3     , array[3] & 0x7Fu);
+    g_synth.control_change(SEQ_VELO_4     , array[4] & 0x7Fu);
+    g_synth.control_change(SEQ_VELO_5     , array[5] & 0x7Fu);
+    g_synth.control_change(SEQ_VELO_6     , array[6] & 0x7Fu);
+    g_synth.control_change(SEQ_VELO_7     , array[7] & 0x7Fu);
+  } else if (target == PANIC_OP) {
+    handleControlChange(((g_midi_ch + s_current_synth) & 0x0F) + 1, ALL_SOUND_OFF  , 0);
+    handleControlChange(((g_midi_ch + s_current_synth) & 0x0F) + 1, RESET_ALL_CTRLS, 0);
+  }
 }
 
 INLINE void PRA32_U2_ControlPanel_setup() {
@@ -528,6 +570,11 @@ INLINE void PRA32_U2_ControlPanel_setup() {
 
 #if defined(PRA32_U2_USE_CONTROL_PANEL)
   PRA32_U2_ControlPanel_update_page();
+
+#if defined(PRA32_U2_USE_CONTROL_PANEL_ENCODER_INPUT)
+  PRA32_U2_UI_EncoderInput_setup();
+  PRA32_U2_UI_StateMachine_initialize(PRA32_U2_ControlPanel_update_page);
+#endif
 
 #if defined(PRA32_U2_USE_CONTROL_PANEL_ANALOG_INPUT)
   adc_init();
@@ -580,7 +627,11 @@ INLINE void PRA32_U2_ControlPanel_initialize_parameters() {
 }
 
 INLINE void PRA32_U2_ControlPanel_update_analog_inputs(uint32_t loop_counter) {
+#if defined(PRA32_U2_USE_CONTROL_PANEL_ENCODER_INPUT)
+  static_cast<void>(loop_counter);
+#else
   PRA32_U2_UI_InputLegacy_update_analog_inputs(loop_counter, s_adc_current_value);
+#endif
 }
 
 INLINE void PRA32_U2_ControlPanel_update_control() {
@@ -603,6 +654,19 @@ INLINE void PRA32_U2_ControlPanel_update_control() {
     return;
   }
 
+#if defined(PRA32_U2_USE_CONTROL_PANEL_ENCODER_INPUT)
+  PRA32_U2_UI_EncoderInputEvent event = PRA32_U2_UI_EncoderInput_poll();
+  PRA32_U2_UI_StateMachine_process_event(event,
+                                         PRA32_U2_ControlPanel_get_target_value,
+                                         PRA32_U2_ControlPanel_set_target_value,
+                                         PRA32_U2_ControlPanel_execute_action_target,
+                                         PRA32_U2_ControlPanel_update_page);
+
+  PRA32_U2_UI_FocusItem focus_item = PRA32_U2_UI_StateMachine_focused_item();
+  s_adc_control_target[0] = focus_item.target;
+  s_adc_control_target[1] = 0xFF;
+  s_adc_control_target[2] = 0xFF;
+#else
 #if defined(PRA32_U2_USE_CONTROL_PANEL_KEY_INPUT)
   static uint32_t s_prev_key_value_changed_time = 0;
   static uint32_t s_next_key_value_changed_time = 0;
@@ -932,6 +996,7 @@ INLINE void PRA32_U2_ControlPanel_update_control() {
     }
   }
 #endif  // defined(PRA32_U2_USE_CONTROL_PANEL_ANALOG_INPUT)
+#endif  // defined(PRA32_U2_USE_CONTROL_PANEL_ENCODER_INPUT)
 
 #endif  // defined(PRA32_U2_USE_CONTROL_PANEL)
 }
@@ -974,6 +1039,25 @@ INLINE void PRA32_U2_ControlPanel_update_display_buffer(uint32_t loop_counter) {
 #if defined(PRA32_U2_USE_CONTROL_PANEL)
   if ((loop_counter & 0x7F) == 0x00) {
     char buff[6];
+
+#if defined(PRA32_U2_USE_CONTROL_PANEL_ENCODER_INPUT)
+    PRA32_U2_UI_StateSnapshot snapshot = PRA32_U2_UI_StateMachine_snapshot();
+    const char* state_text = "GROUP";
+    switch (snapshot.state) {
+    case PRA32_U2_UI_State_GroupNavigation: state_text = "GROUP"; break;
+    case PRA32_U2_UI_State_PageNavigation:  state_text = "PAGE "; break;
+    case PRA32_U2_UI_State_ItemNavigation:  state_text = "ITEM "; break;
+    case PRA32_U2_UI_State_ItemEdit:        state_text = "EDIT "; break;
+    case PRA32_U2_UI_State_ActionConfirm:   state_text = "CONF "; break;
+    }
+    std::memcpy(&s_display_buffer[0][0], "UI:", 3);
+    std::memcpy(&s_display_buffer[0][3], state_text, 5);
+    s_display_buffer[0][8] = snapshot.confirm_selected ? 'Y' : 'N';
+    s_display_buffer[0][9] = ' ';
+
+    std::memset(&s_display_buffer[7][11], ' ', 10);
+    std::memset(&s_display_buffer[3][11], ' ', 10);
+#endif
 
     uint8_t adc_control_target_0 = s_adc_control_target[0];
     if (adc_control_target_0 < 0xFF) {

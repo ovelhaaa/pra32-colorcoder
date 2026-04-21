@@ -53,6 +53,7 @@
 //#define PRA32_U2_USE_CONTROL_PANEL               // PRA32-U2/P (PRA32-U2 with Panel)
 
 #define PRA32_U2_USE_CONTROL_PANEL_KEY_INPUT     // Use tactile switches
+#define PRA32_U2_USE_CONTROL_PANEL_ENCODER_INPUT // New single-encoder path
 #define PRA32_U2_KEY_INPUT_ACTIVE_LEVEL          (LOW)
 #define PRA32_U2_KEY_INPUT_PIN_MODE              (INPUT_PULLUP)
 #define PRA32_U2_KEY_INPUT_PREV_KEY_PIN          (16)
@@ -63,8 +64,15 @@
 //#define PRA32_U2_KEY_INPUT_SHIFT_KEY_PIN         (21)
 #define PRA32_U2_KEY_ANTI_CHATTERING_WAIT        (15)
 #define PRA32_U2_KEY_LONG_PRESS_WAIT             (375)
+#define PRA32_U2_ENCODER_PIN_A                   (14)  // Hardware placeholder
+#define PRA32_U2_ENCODER_PIN_B                   (15)  // Hardware placeholder
+#define PRA32_U2_ENCODER_SWITCH_PIN              (16)  // Hardware placeholder
+#define PRA32_U2_ENCODER_ACTIVE_LEVEL            (LOW)
+#define PRA32_U2_ENCODER_PIN_MODE                (INPUT_PULLUP)
+#define PRA32_U2_ENCODER_DEBOUNCE_TICKS          (15)
+#define PRA32_U2_ENCODER_LONG_PRESS_TICKS        (375)
 
-#define PRA32_U2_USE_CONTROL_PANEL_ANALOG_INPUT  // Use ADC0, ADC1, and ADC2
+#define PRA32_U2_USE_CONTROL_PANEL_ANALOG_INPUT  // Legacy ADC path (fallback)
 #define PRA32_U2_ANALOG_INPUT_REVERSED           (true)
 #define PRA32_U2_ANALOG_INPUT_CORRECTION         (-2040)
 #define PRA32_U2_ANALOG_INPUT_DENOMINATOR        (480)
