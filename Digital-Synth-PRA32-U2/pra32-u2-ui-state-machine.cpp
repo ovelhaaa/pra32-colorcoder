@@ -8,7 +8,7 @@ static uint8_t s_item_index = 0;
 static uint8_t s_edit_original_value = 0;
 static bool s_confirm_selected = false;
 
-static bool PRA32_U2_UI_StateMachine_is_dangerous_action(uint8_t target) {
+bool PRA32_U2_UI_StateMachine_is_dangerous_action_target(uint8_t target) {
   if ((target >= WR_PROGRAM_0 && target <= WR_PROGRAM_15) ||
       (target >= RD_PROGRAM_0 && target <= RD_PROGRAM_15)) {
     return true;
@@ -27,7 +27,7 @@ static PRA32_U2_UI_FocusItemType PRA32_U2_UI_StateMachine_item_type(uint8_t targ
     return PRA32_U2_UI_FocusItemType_None;
   }
 
-  if (PRA32_U2_UI_StateMachine_is_dangerous_action(target)) {
+  if (PRA32_U2_UI_StateMachine_is_dangerous_action_target(target)) {
     return PRA32_U2_UI_FocusItemType_Action;
   }
 

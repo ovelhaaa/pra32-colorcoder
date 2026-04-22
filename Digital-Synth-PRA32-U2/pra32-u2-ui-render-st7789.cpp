@@ -27,6 +27,18 @@ const uint16_t COLOR_FOOTER_TEXT   = ST77XX_WHITE;
 const uint16_t COLOR_CARD_TEXT     = ST77XX_WHITE;
 const uint16_t COLOR_FOCUS_TEXT    = ST77XX_BLACK;
 const uint16_t COLOR_HELP_BG       = ST77XX_BLACK;
+const uint16_t COLOR_CARD_BG_NORMAL  = 0x18E3;
+const uint16_t COLOR_CARD_BG_ACTION  = 0x3000;
+
+const int DISPLAY_WIDTH   = PRA32_U2_ST7789_WIDTH;
+const int HEADER_Y        = 0;
+const int HEADER_HEIGHT   = 14;
+const int MAIN_Y          = 18;
+const int CARD_WIDTH      = 90;
+const int CARD_HEIGHT     = 42;
+const int CARD_GAP_X      = 4;
+const int FOOTER_Y        = 64;
+const int FOOTER_HEIGHT   = 12;
 
 uint16_t group_background(uint8_t group) {
   switch (group) {
@@ -83,7 +95,7 @@ const char* state_short_text(PRA32_U2_UI_State state) {
 }
 
 void draw_footer_help(PRA32_U2_UI_State state, bool confirm_selected) {
-  g_st7789.fillRect(0, 64, 284, 12, COLOR_HELP_BG);
+  g_st7789.fillRect(0, FOOTER_Y, DISPLAY_WIDTH, FOOTER_HEIGHT, COLOR_HELP_BG);
   g_st7789.setTextSize(1);
   g_st7789.setTextColor(COLOR_FOOTER_TEXT);
   g_st7789.setCursor(2, 66);
@@ -99,10 +111,22 @@ void draw_footer_help(PRA32_U2_UI_State state, bool confirm_selected) {
   }
 }
 
+bool same_header(const PRA32_U2_UI_RenderFrame& a, const PRA32_U2_UI_RenderFrame& b) {
+  return a.page_group == b.page_group &&
+         a.page_index == b.page_index &&
+         a.page_count == b.page_count &&
+         a.state == b.state &&
+         std::strncmp(a.page_name, b.page_name, sizeof(a.page_name)) == 0 &&
+         std::strncmp(a.mode_text, b.mode_text, sizeof(a.mode_text)) == 0 &&
+         std::strncmp(a.status_text, b.status_text, sizeof(a.status_text)) == 0;
+}
+
 }  // namespace
 
 void PRA32_U2_UI_RenderST7789_setup() {
-  SPI.begin(PRA32_U2_ST7789_PIN_SCK, PRA32_U2_ST7789_PIN_MOSI, -1, PRA32_U2_ST7789_PIN_CS);
+  SPI.setSCK(PRA32_U2_ST7789_PIN_SCK);
+  SPI.setTX(PRA32_U2_ST7789_PIN_MOSI);
+  SPI.begin();
   g_st7789.init(PRA32_U2_ST7789_WIDTH, PRA32_U2_ST7789_HEIGHT);
   g_st7789.setRotation(PRA32_U2_ST7789_ROTATION);
   g_st7789.fillScreen(COLOR_BLACK);
@@ -114,47 +138,59 @@ void PRA32_U2_UI_RenderST7789_draw(const PRA32_U2_UI_RenderFrame& frame) {
     return;
   }
 
-  g_st7789.fillScreen(COLOR_BLACK);
+  const bool redraw_header = !g_prev_frame_valid || !same_header(g_prev_frame, frame);
+  const bool redraw_footer = !g_prev_frame_valid ||
+                             (g_prev_frame.state != frame.state) ||
+                             (g_prev_frame.confirm_selected != frame.confirm_selected);
 
   const uint16_t group_color = group_background(frame.page_group);
-  g_st7789.fillRect(0, 0, 284, 14, group_color);
-  g_st7789.setTextSize(1);
-  g_st7789.setTextColor(COLOR_HEADER_TEXT);
+  if (redraw_header) {
+    g_st7789.fillRect(0, HEADER_Y, DISPLAY_WIDTH, HEADER_HEIGHT, group_color);
+    g_st7789.setTextSize(1);
+    g_st7789.setTextColor(COLOR_HEADER_TEXT);
 
-  g_st7789.setCursor(2, 3);
-  g_st7789.print(static_cast<char>('A' + frame.page_group));
-  g_st7789.print("-");
-  g_st7789.print(frame.page_index);
-  g_st7789.print("/");
-  g_st7789.print(frame.page_count ? frame.page_count - 1 : 0);
+    g_st7789.setCursor(2, 3);
+    g_st7789.print(static_cast<char>('A' + frame.page_group));
+    g_st7789.print("-");
+    g_st7789.print(frame.page_index);
+    g_st7789.print("/");
+    g_st7789.print(frame.page_count ? frame.page_count - 1 : 0);
 
-  g_st7789.setCursor(44, 3);
-  g_st7789.print(frame.page_name);
+    g_st7789.setCursor(44, 3);
+    g_st7789.print(frame.page_name);
 
-  g_st7789.setCursor(198, 3);
-  g_st7789.print(frame.mode_text);
-  g_st7789.print(" ");
-  g_st7789.print(state_short_text(frame.state));
+    g_st7789.setCursor(198, 3);
+    g_st7789.print(frame.mode_text);
+    g_st7789.print(" ");
+    g_st7789.print(state_short_text(frame.state));
 
-  g_st7789.setCursor(240, 3);
-  g_st7789.print(frame.status_text);
+    g_st7789.setCursor(240, 3);
+    g_st7789.print(frame.status_text);
+  }
 
   for (uint8_t index = 0; index < 3; ++index) {
     const PRA32_U2_UI_RenderItem& item = frame.items[index];
+    bool redraw_card = !g_prev_frame_valid || !same_item(item, g_prev_frame.items[index]);
+    if (!redraw_card) {
+      continue;
+    }
+
+    const int x = CARD_GAP_X + (index * (CARD_WIDTH + CARD_GAP_X));
+    const int y = MAIN_Y;
+    const int w = CARD_WIDTH;
+    const int h = CARD_HEIGHT;
+
+    g_st7789.fillRect(x, y, w, h, COLOR_BLACK);
+
     if (!item.visible) {
       continue;
     }
 
-    const int x = 4 + (index * 94);
-    const int y = 18;
-    const int w = 90;
-    const int h = 42;
-
-    uint16_t card_bg = 0x18E3;
+    uint16_t card_bg = COLOR_CARD_BG_NORMAL;
     uint16_t border_color = group_color;
 
     if (item.type == PRA32_U2_UI_FocusItemType_Action) {
-      card_bg = 0x3000;
+      card_bg = COLOR_CARD_BG_ACTION;
       border_color = COLOR_DANGER;
     }
 
@@ -195,7 +231,9 @@ void PRA32_U2_UI_RenderST7789_draw(const PRA32_U2_UI_RenderFrame& frame) {
     }
   }
 
-  draw_footer_help(frame.state, frame.confirm_selected);
+  if (redraw_footer) {
+    draw_footer_help(frame.state, frame.confirm_selected);
+  }
 
   g_prev_frame = frame;
   g_prev_frame_valid = true;

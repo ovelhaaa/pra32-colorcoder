@@ -592,6 +592,7 @@ static INLINE void PRA32_U2_ControlPanel_build_st7789_frame(PRA32_U2_UI_RenderFr
   }
 
   PRA32_U2_UI_StateSnapshot snapshot = PRA32_U2_UI_StateMachine_snapshot();
+  PRA32_U2_UI_FocusItem focused_item = PRA32_U2_UI_StateMachine_focused_item();
   frame.state = snapshot.state;
   frame.confirm_selected = snapshot.confirm_selected;
 
@@ -618,22 +619,15 @@ static INLINE void PRA32_U2_ControlPanel_build_st7789_frame(PRA32_U2_UI_RenderFr
     item.target = targets[i];
     item.focused = (snapshot.focused_item_count > 0) &&
                    (snapshot.focused_item_index < snapshot.focused_item_count) &&
-                   (PRA32_U2_UI_StateMachine_focused_item().source_index == i);
+                   (focused_item.source_index == i);
 
     if (!item.visible) {
       continue;
     }
 
-    item.type = PRA32_U2_UI_StateMachine_focused_item().type;
+    item.type = focused_item.type;
     if (!item.focused) {
-      if ((targets[i] >= WR_PROGRAM_0 && targets[i] <= WR_PROGRAM_15) ||
-          (targets[i] >= RD_PROGRAM_0 && targets[i] <= RD_PROGRAM_15) ||
-          (targets[i] == WR_PANEL_PRMS) ||
-          (targets[i] == RD_PANEL_PRMS) ||
-          (targets[i] == IN_PANEL_PRMS) ||
-          (targets[i] == PANIC_OP) ||
-          (targets[i] == SEQ_RAND_PITCH) ||
-          (targets[i] == SEQ_RAND_VELO)) {
+      if (PRA32_U2_UI_StateMachine_is_dangerous_action_target(targets[i])) {
         item.type = PRA32_U2_UI_FocusItemType_Action;
       } else {
         item.type = PRA32_U2_UI_FocusItemType_Parameter;

@@ -21,7 +21,7 @@ struct PRA32_U2_UI_RenderFrame {
   uint8_t page_count;
   PRA32_U2_UI_State state;
   bool confirm_selected;
-  char page_name[21];
+  char page_name[22];
   char mode_text[4];
   char status_text[12];
   PRA32_U2_UI_RenderItem items[3];
