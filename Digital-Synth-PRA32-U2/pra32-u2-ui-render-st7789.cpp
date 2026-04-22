@@ -39,6 +39,8 @@ const int CARD_HEIGHT     = 42;
 const int CARD_GAP_X      = 4;
 const int FOOTER_Y        = 64;
 const int FOOTER_HEIGHT   = 12;
+const int OVERLAY_Y       = 60;
+const int OVERLAY_HEIGHT  = 4;
 
 uint16_t group_background(uint8_t group) {
   switch (group) {
@@ -121,6 +123,33 @@ bool same_header(const PRA32_U2_UI_RenderFrame& a, const PRA32_U2_UI_RenderFrame
          std::strncmp(a.status_text, b.status_text, sizeof(a.status_text)) == 0;
 }
 
+bool has_confirm_overlay(const PRA32_U2_UI_RenderFrame& frame) {
+  return frame.state == PRA32_U2_UI_State_ActionConfirm;
+}
+
+const char* focused_label(const PRA32_U2_UI_RenderFrame& frame) {
+  for (uint8_t i = 0; i < 3; ++i) {
+    if (frame.items[i].visible && frame.items[i].focused) {
+      return frame.items[i].short_label;
+    }
+  }
+  return "";
+}
+
+void draw_confirm_overlay(const PRA32_U2_UI_RenderFrame& frame, bool redraw) {
+  if (!redraw) {
+    return;
+  }
+
+  g_st7789.fillRect(0, OVERLAY_Y, DISPLAY_WIDTH, OVERLAY_HEIGHT, COLOR_BLACK);
+  if (!has_confirm_overlay(frame)) {
+    return;
+  }
+
+  const uint16_t overlay_color = frame.confirm_selected ? COLOR_DANGER : COLOR_CARD_BG_ACTION;
+  g_st7789.fillRect(0, OVERLAY_Y, DISPLAY_WIDTH, OVERLAY_HEIGHT, overlay_color);
+}
+
 }  // namespace
 
 void PRA32_U2_UI_RenderST7789_setup() {
@@ -137,9 +166,14 @@ void PRA32_U2_UI_RenderST7789_draw(const PRA32_U2_UI_RenderFrame& frame) {
   }
 
   const bool redraw_header = !g_prev_frame_valid || !same_header(g_prev_frame, frame);
+  const bool redraw_main_base = !g_prev_frame_valid || (g_prev_frame.page_group != frame.page_group);
   const bool redraw_footer = !g_prev_frame_valid ||
                              (g_prev_frame.state != frame.state) ||
                              (g_prev_frame.confirm_selected != frame.confirm_selected);
+  const bool redraw_overlay = !g_prev_frame_valid ||
+                              (has_confirm_overlay(g_prev_frame) != has_confirm_overlay(frame)) ||
+                              (g_prev_frame.confirm_selected != frame.confirm_selected) ||
+                              (std::strncmp(focused_label(g_prev_frame), focused_label(frame), 10) != 0);
 
   const uint16_t group_color = group_background(frame.page_group);
   if (redraw_header) {
@@ -168,7 +202,7 @@ void PRA32_U2_UI_RenderST7789_draw(const PRA32_U2_UI_RenderFrame& frame) {
 
   for (uint8_t index = 0; index < 3; ++index) {
     const PRA32_U2_UI_RenderItem& item = frame.items[index];
-    bool redraw_card = !g_prev_frame_valid || !same_item(item, g_prev_frame.items[index]);
+    bool redraw_card = redraw_main_base || !same_item(item, g_prev_frame.items[index]);
     if (!redraw_card) {
       continue;
     }
@@ -228,6 +262,8 @@ void PRA32_U2_UI_RenderST7789_draw(const PRA32_U2_UI_RenderFrame& frame) {
       g_st7789.print(frame.confirm_selected ? "[YES] no " : " yes [NO]");
     }
   }
+
+  draw_confirm_overlay(frame, redraw_overlay);
 
   if (redraw_footer) {
     draw_footer_help(frame.state, frame.confirm_selected);
