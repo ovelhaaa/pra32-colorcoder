@@ -61,6 +61,12 @@ static INLINE void PRA32_U2_ControlPanel_set_target_value(uint8_t target, uint8_
 static INLINE void PRA32_U2_ControlPanel_execute_action_target(uint8_t target);
 static INLINE void PRA32_U2_ControlPanel_build_short_label(const char line0[11], const char line1[11], char out[11]);
 static INLINE void PRA32_U2_ControlPanel_build_st7789_frame(PRA32_U2_UI_RenderFrame& frame);
+static INLINE void PRA32_U2_ControlPanel_request_st7789_redraw();
+static INLINE bool PRA32_U2_ControlPanel_st7789_target_is_visible(uint8_t target);
+static INLINE bool PRA32_U2_ControlPanel_consume_st7789_redraw_request();
+
+static volatile bool s_st7789_redraw_requested = true;
+static uint8_t s_st7789_visible_targets[3] = {0xFF, 0xFF, 0xFF};
 
 
 static INLINE void PRA32_U2_ControlPanel_update_page() {
@@ -82,15 +88,20 @@ static INLINE void PRA32_U2_ControlPanel_update_page() {
   std::memcpy(&s_display_buffer[5][ 0], current_page.control_target_a_name_line_0, 10);
   std::memcpy(&s_display_buffer[6][ 0], current_page.control_target_a_name_line_1, 10);
   s_adc_control_target[0]             = current_page.control_target_a;
+  s_st7789_visible_targets[0]         = current_page.control_target_a;
 
   std::memcpy(&s_display_buffer[5][11], current_page.control_target_b_name_line_0, 10);
   std::memcpy(&s_display_buffer[6][11], current_page.control_target_b_name_line_1, 10);
   s_adc_control_target[1]             = current_page.control_target_b;
+  s_st7789_visible_targets[1]         = current_page.control_target_b;
 
 #if defined(PRA32_U2_KEY_INPUT_PLAY_KEY_PIN)
   std::memcpy(&s_display_buffer[1][11], current_page.control_target_c_name_line_0, 10);
   std::memcpy(&s_display_buffer[2][11], current_page.control_target_c_name_line_1, 10);
   s_adc_control_target[2]             = current_page.control_target_c;
+  s_st7789_visible_targets[2]         = current_page.control_target_c;
+#else
+  s_st7789_visible_targets[2]         = current_page.control_target_c;
 #endif  // defined(PRA32_U2_KEY_INPUT_PLAY_KEY_PIN)
 
 #if (PRA32_U2_NUMBER_OF_SYNTHS > 1)
@@ -104,6 +115,7 @@ static INLINE void PRA32_U2_ControlPanel_update_page() {
 #endif  // defined(PRA32_U2_KEY_INPUT_PROG_MINUS_KEY_PIN) || defined(PRA32_U2_KEY_INPUT_PROG_PLUS_KEY_PIN)
 
   s_display_draw_counter = -1;
+  PRA32_U2_ControlPanel_request_st7789_redraw();
 }
 
 static INLINE uint8_t PRA32_U2_ControlPanel_adc_control_value_candidate(uint32_t adc_number) {
@@ -315,6 +327,7 @@ static INLINE void PRA32_U2_ControlPanel_seq_start() {
   }
 
   s_playing_status = PlayingStatus_Seq;
+  PRA32_U2_ControlPanel_request_st7789_redraw();
 
   if (s_seq_mode == 0) {  // Forward
     s_seq_step = 31;
@@ -343,6 +356,7 @@ static INLINE void PRA32_U2_ControlPanel_seq_stop() {
   }
 
   s_playing_status = PlayingStatus_Stop;
+  PRA32_U2_ControlPanel_request_st7789_redraw();
   s_display_buffer[0][20] = ' ';
   s_panel_play_note_gate = false;
 }
@@ -499,6 +513,7 @@ static INLINE void PRA32_U2_ControlPanel_set_target_value(uint8_t target, uint8_
   } else if (target < 128 + 64) {
     g_synth.control_change(target, value);
   }
+  PRA32_U2_ControlPanel_request_st7789_redraw();
 }
 
 static INLINE void PRA32_U2_ControlPanel_execute_action_target(uint8_t target) {
@@ -539,6 +554,7 @@ static INLINE void PRA32_U2_ControlPanel_execute_action_target(uint8_t target) {
     handleControlChange(((g_midi_ch + s_current_synth) & 0x0F) + 1, ALL_SOUND_OFF  , 0);
     handleControlChange(((g_midi_ch + s_current_synth) & 0x0F) + 1, RESET_ALL_CTRLS, 0);
   }
+  PRA32_U2_ControlPanel_request_st7789_redraw();
 }
 
 static INLINE void PRA32_U2_ControlPanel_build_short_label(const char line0[11], const char line1[11], char out[11]) {
@@ -563,6 +579,20 @@ static INLINE void PRA32_U2_ControlPanel_build_short_label(const char line0[11],
   for (uint8_t i = 0; i < end; ++i) {
     out[i] = source[i];
   }
+}
+
+static INLINE void PRA32_U2_ControlPanel_request_st7789_redraw() {
+  __atomic_store_n(&s_st7789_redraw_requested, true, __ATOMIC_RELEASE);
+}
+
+static INLINE bool PRA32_U2_ControlPanel_consume_st7789_redraw_request() {
+  return __atomic_exchange_n(&s_st7789_redraw_requested, false, __ATOMIC_ACQ_REL);
+}
+
+static INLINE bool PRA32_U2_ControlPanel_st7789_target_is_visible(uint8_t target) {
+  return (s_st7789_visible_targets[0] == target) ||
+         (s_st7789_visible_targets[1] == target) ||
+         (s_st7789_visible_targets[2] == target);
 }
 
 static INLINE void PRA32_U2_ControlPanel_build_st7789_frame(PRA32_U2_UI_RenderFrame& frame) {
@@ -767,6 +797,9 @@ INLINE void PRA32_U2_ControlPanel_update_control() {
 
 #if defined(PRA32_U2_USE_CONTROL_PANEL_ENCODER_INPUT)
   PRA32_U2_UI_EncoderInputEvent event = PRA32_U2_UI_EncoderInput_poll();
+  if ((event.rotation_delta != 0) || event.short_click || event.long_click) {
+    PRA32_U2_ControlPanel_request_st7789_redraw();
+  }
   PRA32_U2_UI_StateMachine_process_event(event,
                                          PRA32_U2_ControlPanel_get_target_value,
                                          PRA32_U2_ControlPanel_set_target_value,
@@ -975,6 +1008,7 @@ INLINE void PRA32_U2_ControlPanel_update_control() {
           s_display_buffer[0][20] = '*';
           s_panel_play_note_gate    = true;
           s_panel_play_note_trigger = true;
+          PRA32_U2_ControlPanel_request_st7789_redraw();
         }
       } else {
         // Play key released
@@ -982,6 +1016,7 @@ INLINE void PRA32_U2_ControlPanel_update_control() {
           s_playing_status = PlayingStatus_Stop;
           s_display_buffer[0][20] = ' ';
           s_panel_play_note_gate = false;
+          PRA32_U2_ControlPanel_request_st7789_redraw();
         } else {  // Seq Mode
           if (s_playing_status == PlayingStatus_Stop) {
             PRA32_U2_ControlPanel_seq_start();
@@ -1391,7 +1426,7 @@ INLINE void PRA32_U2_ControlPanel_update_display(uint32_t loop_counter) {
 #endif  // defined(PRA32_U2_USE_CONTROL_PANEL_OLED_DISPLAY)
 
 #if defined(PRA32_U2_USE_CONTROL_PANEL_ST7789_DISPLAY)
-  if ((loop_counter & 0x3F) == 0x00) {
+  if (PRA32_U2_ControlPanel_consume_st7789_redraw_request()) {
     PRA32_U2_UI_RenderFrame frame = {};
     PRA32_U2_ControlPanel_build_st7789_frame(frame);
     PRA32_U2_UI_RenderST7789_draw(frame);
@@ -1417,6 +1452,13 @@ INLINE void PRA32_U2_ControlPanel_update_display(uint32_t loop_counter) {
   if (s_adc_control_target[2] == control_number) {
     s_adc_control_catched[2] = false;
   }
+
+#if defined(PRA32_U2_USE_CONTROL_PANEL_ST7789_DISPLAY)
+  if (PRA32_U2_ControlPanel_st7789_target_is_visible(control_number) ||
+      (control_number == PANEL_PLAY_MODE)) {
+    PRA32_U2_ControlPanel_request_st7789_redraw();
+  }
+#endif  // defined(PRA32_U2_USE_CONTROL_PANEL_ST7789_DISPLAY)
 
   if ((control_number == PANEL_PLAY_PIT ) ||
       (control_number == PANEL_PLAY_VELO) ||
