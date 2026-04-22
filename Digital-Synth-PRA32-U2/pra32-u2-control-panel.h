@@ -684,13 +684,12 @@ static INLINE void PRA32_U2_ControlPanel_build_st7789_frame(PRA32_U2_UI_RenderFr
       continue;
     }
 
-    item.type = focused_item.type;
-    if (!item.focused) {
-      if (PRA32_U2_UI_StateMachine_is_dangerous_action_target(targets[i])) {
-        item.type = PRA32_U2_UI_FocusItemType_Action;
-      } else {
-        item.type = PRA32_U2_UI_FocusItemType_Parameter;
-      }
+    if (targets[i] == 0xFF) {
+      item.type = PRA32_U2_UI_FocusItemType_None;
+    } else if (PRA32_U2_UI_StateMachine_is_dangerous_action_target(targets[i])) {
+      item.type = PRA32_U2_UI_FocusItemType_Action;
+    } else {
+      item.type = PRA32_U2_UI_FocusItemType_Parameter;
     }
 
     item.value = PRA32_U2_ControlPanel_get_target_value(targets[i]);

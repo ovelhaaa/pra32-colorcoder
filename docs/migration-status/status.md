@@ -8,7 +8,7 @@ This file is the explicit marker for migration progress.
 - Phase 2: not-started
 - Phase 3: not-started
 - Phase 4: not-started
-- Phase 5: not-started
+- Phase 5: complete
 
 ## Update rules
 
