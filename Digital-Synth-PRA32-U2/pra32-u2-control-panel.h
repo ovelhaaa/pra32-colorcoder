@@ -6,6 +6,7 @@
 #include "pra32-u2-ui-model.h"
 #include "pra32-u2-ui-format.h"
 #include "pra32-u2-ui-render-legacy-oled.h"
+#include "pra32-u2-ui-render-st7789.h"
 #include "pra32-u2-ui-input-legacy.h"
 #include "pra32-u2-ui-input-encoder.h"
 #include "pra32-u2-ui-state-machine.h"
@@ -58,6 +59,8 @@ extern void writeParametersToProgram(byte channel, byte number);
 static INLINE uint8_t PRA32_U2_ControlPanel_get_target_value(uint8_t target);
 static INLINE void PRA32_U2_ControlPanel_set_target_value(uint8_t target, uint8_t value);
 static INLINE void PRA32_U2_ControlPanel_execute_action_target(uint8_t target);
+static INLINE void PRA32_U2_ControlPanel_build_short_label(const char line0[11], const char line1[11], char out[11]);
+static INLINE void PRA32_U2_ControlPanel_build_st7789_frame(PRA32_U2_UI_RenderFrame& frame);
 
 
 static INLINE void PRA32_U2_ControlPanel_update_page() {
@@ -538,6 +541,110 @@ static INLINE void PRA32_U2_ControlPanel_execute_action_target(uint8_t target) {
   }
 }
 
+static INLINE void PRA32_U2_ControlPanel_build_short_label(const char line0[11], const char line1[11], char out[11]) {
+  const char* source = line1;
+  bool line1_has_text = false;
+  for (uint8_t i = 0; i < 10; ++i) {
+    if ((line1[i] != ' ') && (line1[i] != '\0')) {
+      line1_has_text = true;
+      break;
+    }
+  }
+  if (!line1_has_text) {
+    source = line0;
+  }
+
+  uint8_t end = 10;
+  while ((end > 0) && ((source[end - 1] == ' ') || (source[end - 1] == '\0'))) {
+    --end;
+  }
+
+  std::memset(out, 0, 11);
+  for (uint8_t i = 0; i < end; ++i) {
+    out[i] = source[i];
+  }
+}
+
+static INLINE void PRA32_U2_ControlPanel_build_st7789_frame(PRA32_U2_UI_RenderFrame& frame) {
+  std::memset(&frame, 0, sizeof(frame));
+
+  PRA32_U2_ControlPanelPage current_page = g_control_panel_page_table[s_current_page_group][s_current_page_index[s_current_page_group]];
+  if (s_play_mode == 1) {
+    std::memcpy(current_page.control_target_c_name_line_0, "Seq       ", 10);
+    std::memcpy(current_page.control_target_c_name_line_1, "Pitch Ofst", 10);
+    current_page.control_target_c = SEQ_PIT_OFST;
+  }
+
+  frame.page_group = static_cast<uint8_t>(s_current_page_group);
+  frame.page_index = static_cast<uint8_t>(s_current_page_index[s_current_page_group]);
+  frame.page_count = static_cast<uint8_t>(g_number_of_pages[s_current_page_group]);
+
+  std::snprintf(frame.page_name, sizeof(frame.page_name), "%-10.10s %-10.10s",
+                current_page.page_name_line_0, current_page.page_name_line_1);
+  std::snprintf(frame.mode_text, sizeof(frame.mode_text), "%s", s_play_mode == 1 ? "Seq" : "Nrm");
+
+  if (s_playing_status == PlayingStatus_Seq) {
+    std::snprintf(frame.status_text, sizeof(frame.status_text), "RUN");
+  } else if (s_playing_status == PlayingStatus_Playing) {
+    std::snprintf(frame.status_text, sizeof(frame.status_text), "PLY");
+  } else {
+    std::snprintf(frame.status_text, sizeof(frame.status_text), "STP");
+  }
+
+  PRA32_U2_UI_StateSnapshot snapshot = PRA32_U2_UI_StateMachine_snapshot();
+  PRA32_U2_UI_FocusItem focused_item = PRA32_U2_UI_StateMachine_focused_item();
+  frame.state = snapshot.state;
+  frame.confirm_selected = snapshot.confirm_selected;
+
+  const uint8_t targets[3] = {
+    current_page.control_target_a,
+    current_page.control_target_b,
+    current_page.control_target_c
+  };
+  const char* line0[3] = {
+    current_page.control_target_a_name_line_0,
+    current_page.control_target_b_name_line_0,
+    current_page.control_target_c_name_line_0
+  };
+  const char* line1[3] = {
+    current_page.control_target_a_name_line_1,
+    current_page.control_target_b_name_line_1,
+    current_page.control_target_c_name_line_1
+  };
+
+  for (uint8_t i = 0; i < 3; ++i) {
+    PRA32_U2_UI_RenderItem& item = frame.items[i];
+    item.visible = (targets[i] != 0xFF);
+    item.source_index = i;
+    item.target = targets[i];
+    item.focused = (snapshot.focused_item_count > 0) &&
+                   (snapshot.focused_item_index < snapshot.focused_item_count) &&
+                   (focused_item.source_index == i);
+
+    if (!item.visible) {
+      continue;
+    }
+
+    item.type = focused_item.type;
+    if (!item.focused) {
+      if (PRA32_U2_UI_StateMachine_is_dangerous_action_target(targets[i])) {
+        item.type = PRA32_U2_UI_FocusItemType_Action;
+      } else {
+        item.type = PRA32_U2_UI_FocusItemType_Parameter;
+      }
+    }
+
+    item.value = PRA32_U2_ControlPanel_get_target_value(targets[i]);
+    char value_display_text[5] = {};
+    item.has_value_text = PRA32_U2_ControlPanel_calc_value_display(targets[i], item.value, value_display_text);
+    if (item.has_value_text) {
+      std::memcpy(item.value_text, value_display_text, sizeof(item.value_text));
+    }
+
+    PRA32_U2_ControlPanel_build_short_label(line0[i], line1[i], item.short_label);
+  }
+}
+
 INLINE void PRA32_U2_ControlPanel_setup() {
   s_current_program[0] = (PROGRAM_NUMBER_DEFAULT + ((PRA32_U2_NUMBER_OF_SYNTHS > 1) * 4) + 0) & USER_PROGRAM_NUMBER_MAX;
   for (uint32_t i = 1; i < PRA32_U2_NUMBER_OF_SYNTHS; ++i) {
@@ -619,6 +726,10 @@ INLINE void PRA32_U2_ControlPanel_setup() {
   uint8_t commands_init_1[] = {0x00,  0xAF};
   i2c_write_blocking(PRA32_U2_OLED_DISPLAY_I2C, PRA32_U2_OLED_DISPLAY_I2C_ADDRESS, commands_init_1, sizeof(commands_init_1), false);
 #endif  // defined(PRA32_U2_USE_CONTROL_PANEL_OLED_DISPLAY)
+
+#if defined(PRA32_U2_USE_CONTROL_PANEL_ST7789_DISPLAY)
+  PRA32_U2_UI_RenderST7789_setup();
+#endif  // defined(PRA32_U2_USE_CONTROL_PANEL_ST7789_DISPLAY)
 
 #endif  // defined(PRA32_U2_USE_CONTROL_PANEL)
 }
@@ -1278,6 +1389,14 @@ INLINE void PRA32_U2_ControlPanel_update_display(uint32_t loop_counter) {
     }
   }
 #endif  // defined(PRA32_U2_USE_CONTROL_PANEL_OLED_DISPLAY)
+
+#if defined(PRA32_U2_USE_CONTROL_PANEL_ST7789_DISPLAY)
+  if ((loop_counter & 0x3F) == 0x00) {
+    PRA32_U2_UI_RenderFrame frame = {};
+    PRA32_U2_ControlPanel_build_st7789_frame(frame);
+    PRA32_U2_UI_RenderST7789_draw(frame);
+  }
+#endif  // defined(PRA32_U2_USE_CONTROL_PANEL_ST7789_DISPLAY)
 
 #endif  // defined(PRA32_U2_USE_CONTROL_PANEL)
 }
