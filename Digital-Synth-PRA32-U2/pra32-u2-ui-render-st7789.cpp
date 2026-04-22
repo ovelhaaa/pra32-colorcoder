@@ -124,13 +124,7 @@ bool same_header(const PRA32_U2_UI_RenderFrame& a, const PRA32_U2_UI_RenderFrame
 }  // namespace
 
 void PRA32_U2_UI_RenderST7789_setup() {
-#if defined(ARDUINO_ARCH_RP2040) || defined(ARDUINO_ARCH_MBED_RP2040)
   SPI.begin(PRA32_U2_ST7789_PIN_SCK, -1, PRA32_U2_ST7789_PIN_MOSI, PRA32_U2_ST7789_PIN_CS);
-#else
-  SPI.setSCK(PRA32_U2_ST7789_PIN_SCK);
-  SPI.setTX(PRA32_U2_ST7789_PIN_MOSI);
-  SPI.begin();
-#endif
   g_st7789.init(PRA32_U2_ST7789_WIDTH, PRA32_U2_ST7789_HEIGHT);
   g_st7789.setRotation(PRA32_U2_ST7789_ROTATION);
   g_st7789.fillScreen(COLOR_BLACK);
