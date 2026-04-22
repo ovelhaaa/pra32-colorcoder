@@ -572,7 +572,7 @@ static INLINE void PRA32_U2_ControlPanel_build_short_label(const char line0[11],
   }
 }
 
-static bool s_st7789_redraw_requested = true;
+static volatile bool s_st7789_redraw_requested = true;
 
 static INLINE void PRA32_U2_ControlPanel_request_st7789_redraw() {
   s_st7789_redraw_requested = true;
