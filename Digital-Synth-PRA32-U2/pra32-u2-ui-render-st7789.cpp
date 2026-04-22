@@ -85,6 +85,14 @@ bool same_frame(const PRA32_U2_UI_RenderFrame& a, const PRA32_U2_UI_RenderFrame&
   return true;
 }
 
+enum PRA32_U2_UI_RenderDirtyMask : uint8_t {
+  PRA32_U2_UI_RenderDirty_None    = 0,
+  PRA32_U2_UI_RenderDirty_Header  = 1 << 0,
+  PRA32_U2_UI_RenderDirty_Main    = 1 << 1,
+  PRA32_U2_UI_RenderDirty_Footer  = 1 << 2,
+  PRA32_U2_UI_RenderDirty_Overlay = 1 << 3,
+};
+
 const char* state_short_text(PRA32_U2_UI_State state) {
   switch (state) {
   case PRA32_U2_UI_State_GroupNavigation: return "Grp";
@@ -127,13 +135,22 @@ bool has_confirm_overlay(const PRA32_U2_UI_RenderFrame& frame) {
   return frame.state == PRA32_U2_UI_State_ActionConfirm;
 }
 
-const char* focused_label(const PRA32_U2_UI_RenderFrame& frame) {
+const PRA32_U2_UI_RenderItem* focused_item(const PRA32_U2_UI_RenderFrame& frame) {
   for (uint8_t i = 0; i < 3; ++i) {
     if (frame.items[i].visible && frame.items[i].focused) {
-      return frame.items[i].short_label;
+      return &frame.items[i];
     }
   }
-  return "";
+  return nullptr;
+}
+
+bool same_focused_label(const PRA32_U2_UI_RenderFrame& a, const PRA32_U2_UI_RenderFrame& b) {
+  const PRA32_U2_UI_RenderItem* focused_a = focused_item(a);
+  const PRA32_U2_UI_RenderItem* focused_b = focused_item(b);
+  if ((focused_a == nullptr) || (focused_b == nullptr)) {
+    return focused_a == focused_b;
+  }
+  return std::strncmp(focused_a->short_label, focused_b->short_label, sizeof(focused_a->short_label)) == 0;
 }
 
 void draw_confirm_overlay(const PRA32_U2_UI_RenderFrame& frame, bool redraw) {
@@ -163,18 +180,27 @@ void PRA32_U2_UI_RenderST7789_draw(const PRA32_U2_UI_RenderFrame& frame) {
     return;
   }
 
-  const bool redraw_header = !g_prev_frame_valid || !same_header(g_prev_frame, frame);
-  const bool redraw_main_base = !g_prev_frame_valid || (g_prev_frame.page_group != frame.page_group);
-  const bool redraw_footer = !g_prev_frame_valid ||
-                             (g_prev_frame.state != frame.state) ||
-                             (g_prev_frame.confirm_selected != frame.confirm_selected);
-  const bool redraw_overlay = !g_prev_frame_valid ||
-                              (has_confirm_overlay(g_prev_frame) != has_confirm_overlay(frame)) ||
-                              (g_prev_frame.confirm_selected != frame.confirm_selected) ||
-                              (std::strncmp(focused_label(g_prev_frame), focused_label(frame), 10) != 0);
+  uint8_t dirty = PRA32_U2_UI_RenderDirty_None;
+  if (!g_prev_frame_valid || !same_header(g_prev_frame, frame)) {
+    dirty |= PRA32_U2_UI_RenderDirty_Header;
+  }
+  if (!g_prev_frame_valid || (g_prev_frame.page_group != frame.page_group)) {
+    dirty |= PRA32_U2_UI_RenderDirty_Main;
+  }
+  if (!g_prev_frame_valid ||
+      (g_prev_frame.state != frame.state) ||
+      (g_prev_frame.confirm_selected != frame.confirm_selected)) {
+    dirty |= PRA32_U2_UI_RenderDirty_Footer;
+  }
+  if (!g_prev_frame_valid ||
+      (has_confirm_overlay(g_prev_frame) != has_confirm_overlay(frame)) ||
+      (g_prev_frame.confirm_selected != frame.confirm_selected) ||
+      !same_focused_label(g_prev_frame, frame)) {
+    dirty |= PRA32_U2_UI_RenderDirty_Overlay;
+  }
 
   const uint16_t group_color = group_background(frame.page_group);
-  if (redraw_header) {
+  if ((dirty & PRA32_U2_UI_RenderDirty_Header) != 0) {
     g_st7789.fillRect(0, HEADER_Y, DISPLAY_WIDTH, HEADER_HEIGHT, group_color);
     g_st7789.setTextSize(1);
     g_st7789.setTextColor(COLOR_HEADER_TEXT);
@@ -200,7 +226,7 @@ void PRA32_U2_UI_RenderST7789_draw(const PRA32_U2_UI_RenderFrame& frame) {
 
   for (uint8_t index = 0; index < 3; ++index) {
     const PRA32_U2_UI_RenderItem& item = frame.items[index];
-    bool redraw_card = redraw_main_base || !same_item(item, g_prev_frame.items[index]);
+    bool redraw_card = ((dirty & PRA32_U2_UI_RenderDirty_Main) != 0) || !same_item(item, g_prev_frame.items[index]);
     if (!redraw_card) {
       continue;
     }
@@ -261,9 +287,9 @@ void PRA32_U2_UI_RenderST7789_draw(const PRA32_U2_UI_RenderFrame& frame) {
     }
   }
 
-  draw_confirm_overlay(frame, redraw_overlay);
+  draw_confirm_overlay(frame, (dirty & PRA32_U2_UI_RenderDirty_Overlay) != 0);
 
-  if (redraw_footer) {
+  if ((dirty & PRA32_U2_UI_RenderDirty_Footer) != 0) {
     draw_footer_help(frame.state, frame.confirm_selected);
   }
 
