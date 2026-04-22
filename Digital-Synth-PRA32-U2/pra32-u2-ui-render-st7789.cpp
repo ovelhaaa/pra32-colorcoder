@@ -18,9 +18,6 @@ Adafruit_ST7789 g_st7789(
 
 PRA32_U2_UI_RenderFrame g_prev_frame = {};
 bool g_prev_frame_valid = false;
-PRA32_U2_UI_RenderFrame g_pending_frame = {};
-bool g_pending_frame_valid = false;
-uint8_t g_pending_region_mask = 0;
 
 const uint16_t COLOR_BLACK         = ST77XX_BLACK;
 const uint16_t COLOR_WHITE         = ST77XX_WHITE;
@@ -32,10 +29,6 @@ const uint16_t COLOR_FOCUS_TEXT    = ST77XX_BLACK;
 const uint16_t COLOR_HELP_BG       = ST77XX_BLACK;
 const uint16_t COLOR_CARD_BG_NORMAL  = 0x18E3;
 const uint16_t COLOR_CARD_BG_ACTION  = 0x3000;
-const uint16_t COLOR_GROUP_A       = 0x03FF;
-const uint16_t COLOR_GROUP_B       = 0x07E0;
-const uint16_t COLOR_GROUP_C       = 0xFD20;
-const uint16_t COLOR_GROUP_D       = 0xD81F;
 
 const int DISPLAY_WIDTH   = PRA32_U2_ST7789_WIDTH;
 const int HEADER_Y        = 0;
@@ -46,19 +39,15 @@ const int CARD_HEIGHT     = 42;
 const int CARD_GAP_X      = 4;
 const int FOOTER_Y        = 64;
 const int FOOTER_HEIGHT   = 12;
-
-const uint8_t REGION_HEADER = 0x01;
-const uint8_t REGION_FOOTER = 0x02;
-const uint8_t REGION_CARD_0 = 0x04;
-const uint8_t REGION_CARD_1 = 0x08;
-const uint8_t REGION_CARD_2 = 0x10;
+const int OVERLAY_Y       = 60;
+const int OVERLAY_HEIGHT  = 4;
 
 uint16_t group_background(uint8_t group) {
   switch (group) {
-  case 0: return COLOR_GROUP_A;
-  case 1: return COLOR_GROUP_B;
-  case 2: return COLOR_GROUP_C;
-  case 3: return COLOR_GROUP_D;
+  case 0: return 0x03FF;  // cyan
+  case 1: return 0x07E0;  // green
+  case 2: return 0xFD20;  // orange
+  case 3: return 0xD81F;  // magenta
   default: return ST77XX_BLUE;
   }
 }
@@ -134,111 +123,29 @@ bool same_header(const PRA32_U2_UI_RenderFrame& a, const PRA32_U2_UI_RenderFrame
          std::strncmp(a.status_text, b.status_text, sizeof(a.status_text)) == 0;
 }
 
-void draw_header(const PRA32_U2_UI_RenderFrame& frame) {
-  const uint16_t group_color = group_background(frame.page_group);
-  g_st7789.fillRect(0, HEADER_Y, DISPLAY_WIDTH, HEADER_HEIGHT, group_color);
-  g_st7789.setTextSize(1);
-  g_st7789.setTextColor(COLOR_HEADER_TEXT);
-
-  g_st7789.setCursor(2, 3);
-  g_st7789.print(static_cast<char>('A' + frame.page_group));
-  g_st7789.print("-");
-  g_st7789.print(frame.page_index);
-  g_st7789.print("/");
-  g_st7789.print(frame.page_count ? frame.page_count - 1 : 0);
-
-  g_st7789.setCursor(44, 3);
-  g_st7789.print(frame.page_name);
-
-  g_st7789.setCursor(198, 3);
-  g_st7789.print(frame.mode_text);
-  g_st7789.print(" ");
-  g_st7789.print(state_short_text(frame.state));
-
-  g_st7789.setCursor(240, 3);
-  g_st7789.print(frame.status_text);
+bool has_confirm_overlay(const PRA32_U2_UI_RenderFrame& frame) {
+  return frame.state == PRA32_U2_UI_State_ActionConfirm;
 }
 
-void draw_card(const PRA32_U2_UI_RenderFrame& frame, uint8_t index) {
-  const PRA32_U2_UI_RenderItem& item = frame.items[index];
-  const uint16_t group_color = group_background(frame.page_group);
-  const int x = CARD_GAP_X + (index * (CARD_WIDTH + CARD_GAP_X));
-  const int y = MAIN_Y;
-  const int w = CARD_WIDTH;
-  const int h = CARD_HEIGHT;
+const char* focused_label(const PRA32_U2_UI_RenderFrame& frame) {
+  for (uint8_t i = 0; i < 3; ++i) {
+    if (frame.items[i].visible && frame.items[i].focused) {
+      return frame.items[i].short_label;
+    }
+  }
+  return "";
+}
 
-  g_st7789.fillRect(x, y, w, h, COLOR_BLACK);
-  if (!item.visible) {
+void draw_confirm_overlay(const PRA32_U2_UI_RenderFrame& frame, bool redraw) {
+  if (!redraw) {
     return;
   }
 
-  uint16_t card_bg = COLOR_CARD_BG_NORMAL;
-  uint16_t border_color = group_color;
-
-  if (item.type == PRA32_U2_UI_FocusItemType_Action) {
-    card_bg = COLOR_CARD_BG_ACTION;
-    border_color = COLOR_DANGER;
+  uint16_t overlay_color = COLOR_BLACK;
+  if (has_confirm_overlay(frame)) {
+    overlay_color = frame.confirm_selected ? COLOR_DANGER : COLOR_CARD_BG_ACTION;
   }
-
-  if (item.focused) {
-    card_bg = (item.type == PRA32_U2_UI_FocusItemType_Action) ? COLOR_DANGER : COLOR_WHITE;
-    border_color = COLOR_WHITE;
-  }
-
-  g_st7789.fillRect(x, y, w, h, card_bg);
-  g_st7789.drawRect(x, y, w, h, border_color);
-
-  g_st7789.setTextColor(item.focused ? COLOR_FOCUS_TEXT : COLOR_CARD_TEXT);
-  g_st7789.setCursor(x + 4, y + 4);
-  g_st7789.print(static_cast<char>('A' + item.source_index));
-  g_st7789.print(":");
-  g_st7789.print(item.short_label);
-
-  g_st7789.setCursor(x + 4, y + 16);
-  if (item.has_value_text) {
-    g_st7789.print(item.value_text);
-    g_st7789.print(" (");
-    g_st7789.print(item.value);
-    g_st7789.print(")");
-  } else {
-    g_st7789.print(item.value);
-  }
-
-  if (item.type == PRA32_U2_UI_FocusItemType_Parameter) {
-    const int bar_x = x + 4;
-    const int bar_y = y + 32;
-    const int bar_w = w - 8;
-    const int fill_w = (bar_w * item.value) / 127;
-    g_st7789.drawRect(bar_x, bar_y, bar_w, 6, item.focused ? COLOR_FOCUS_TEXT : border_color);
-    g_st7789.fillRect(bar_x + 1, bar_y + 1, fill_w, 4, item.focused ? COLOR_FOCUS_TEXT : border_color);
-  } else if (frame.state == PRA32_U2_UI_State_ActionConfirm && item.focused) {
-    g_st7789.setCursor(x + 4, y + 31);
-    g_st7789.print(frame.confirm_selected ? "[YES] no " : " yes [NO]");
-  }
-}
-
-uint8_t changed_region_mask(const PRA32_U2_UI_RenderFrame& prev, bool prev_valid, const PRA32_U2_UI_RenderFrame& next) {
-  if (!prev_valid) {
-    return REGION_HEADER | REGION_FOOTER | REGION_CARD_0 | REGION_CARD_1 | REGION_CARD_2;
-  }
-
-  uint8_t mask = 0;
-  if (!same_header(prev, next)) {
-    mask |= REGION_HEADER;
-  }
-  if ((prev.state != next.state) || (prev.confirm_selected != next.confirm_selected)) {
-    mask |= REGION_FOOTER;
-  }
-  if (!same_item(prev.items[0], next.items[0])) {
-    mask |= REGION_CARD_0;
-  }
-  if (!same_item(prev.items[1], next.items[1])) {
-    mask |= REGION_CARD_1;
-  }
-  if (!same_item(prev.items[2], next.items[2])) {
-    mask |= REGION_CARD_2;
-  }
-  return mask;
+  g_st7789.fillRect(0, OVERLAY_Y, DISPLAY_WIDTH, OVERLAY_HEIGHT, overlay_color);
 }
 
 }  // namespace
@@ -249,48 +156,119 @@ void PRA32_U2_UI_RenderST7789_setup() {
   g_st7789.setRotation(PRA32_U2_ST7789_ROTATION);
   g_st7789.fillScreen(COLOR_BLACK);
   g_prev_frame_valid = false;
-  g_pending_frame_valid = false;
-  g_pending_region_mask = 0;
 }
 
 void PRA32_U2_UI_RenderST7789_draw(const PRA32_U2_UI_RenderFrame& frame) {
-  if (!g_pending_frame_valid || !same_frame(g_pending_frame, frame)) {
-    g_pending_frame = frame;
-    g_pending_frame_valid = true;
-    g_pending_region_mask = changed_region_mask(g_prev_frame, g_prev_frame_valid, g_pending_frame);
-  }
-
-  if (!g_pending_frame_valid || g_pending_region_mask == 0) {
-    if (g_pending_frame_valid) {
-      g_prev_frame = g_pending_frame;
-      g_prev_frame_valid = true;
-      g_pending_frame_valid = false;
-    }
+  if (g_prev_frame_valid && same_frame(g_prev_frame, frame)) {
     return;
   }
 
-  if (g_pending_region_mask & REGION_HEADER) {
-    draw_header(g_pending_frame);
-    g_pending_region_mask &= ~REGION_HEADER;
-  } else if (g_pending_region_mask & REGION_CARD_0) {
-    draw_card(g_pending_frame, 0);
-    g_pending_region_mask &= ~REGION_CARD_0;
-  } else if (g_pending_region_mask & REGION_CARD_1) {
-    draw_card(g_pending_frame, 1);
-    g_pending_region_mask &= ~REGION_CARD_1;
-  } else if (g_pending_region_mask & REGION_CARD_2) {
-    draw_card(g_pending_frame, 2);
-    g_pending_region_mask &= ~REGION_CARD_2;
-  } else if (g_pending_region_mask & REGION_FOOTER) {
-    draw_footer_help(g_pending_frame.state, g_pending_frame.confirm_selected);
-    g_pending_region_mask &= ~REGION_FOOTER;
+  const bool redraw_header = !g_prev_frame_valid || !same_header(g_prev_frame, frame);
+  const bool redraw_main_base = !g_prev_frame_valid || (g_prev_frame.page_group != frame.page_group);
+  const bool redraw_footer = !g_prev_frame_valid ||
+                             (g_prev_frame.state != frame.state) ||
+                             (g_prev_frame.confirm_selected != frame.confirm_selected);
+  const bool redraw_overlay = !g_prev_frame_valid ||
+                              (has_confirm_overlay(g_prev_frame) != has_confirm_overlay(frame)) ||
+                              (g_prev_frame.confirm_selected != frame.confirm_selected) ||
+                              (std::strncmp(focused_label(g_prev_frame), focused_label(frame), 10) != 0);
+
+  const uint16_t group_color = group_background(frame.page_group);
+  if (redraw_header) {
+    g_st7789.fillRect(0, HEADER_Y, DISPLAY_WIDTH, HEADER_HEIGHT, group_color);
+    g_st7789.setTextSize(1);
+    g_st7789.setTextColor(COLOR_HEADER_TEXT);
+
+    g_st7789.setCursor(2, 3);
+    g_st7789.print(static_cast<char>('A' + frame.page_group));
+    g_st7789.print("-");
+    g_st7789.print(frame.page_index);
+    g_st7789.print("/");
+    g_st7789.print(frame.page_count ? frame.page_count - 1 : 0);
+
+    g_st7789.setCursor(44, 3);
+    g_st7789.print(frame.page_name);
+
+    g_st7789.setCursor(198, 3);
+    g_st7789.print(frame.mode_text);
+    g_st7789.print(" ");
+    g_st7789.print(state_short_text(frame.state));
+
+    g_st7789.setCursor(240, 3);
+    g_st7789.print(frame.status_text);
   }
 
-  if (g_pending_region_mask == 0) {
-    g_prev_frame = g_pending_frame;
-    g_prev_frame_valid = true;
-    g_pending_frame_valid = false;
+  for (uint8_t index = 0; index < 3; ++index) {
+    const PRA32_U2_UI_RenderItem& item = frame.items[index];
+    bool redraw_card = redraw_main_base || !same_item(item, g_prev_frame.items[index]);
+    if (!redraw_card) {
+      continue;
+    }
+
+    const int x = CARD_GAP_X + (index * (CARD_WIDTH + CARD_GAP_X));
+    const int y = MAIN_Y;
+    const int w = CARD_WIDTH;
+    const int h = CARD_HEIGHT;
+
+    g_st7789.fillRect(x, y, w, h, COLOR_BLACK);
+
+    if (!item.visible) {
+      continue;
+    }
+
+    uint16_t card_bg = COLOR_CARD_BG_NORMAL;
+    uint16_t border_color = group_color;
+
+    if (item.type == PRA32_U2_UI_FocusItemType_Action) {
+      card_bg = COLOR_CARD_BG_ACTION;
+      border_color = COLOR_DANGER;
+    }
+
+    if (item.focused) {
+      card_bg = (item.type == PRA32_U2_UI_FocusItemType_Action) ? COLOR_DANGER : COLOR_WHITE;
+      border_color = COLOR_WHITE;
+    }
+
+    g_st7789.fillRect(x, y, w, h, card_bg);
+    g_st7789.drawRect(x, y, w, h, border_color);
+
+    g_st7789.setTextColor(item.focused ? COLOR_FOCUS_TEXT : COLOR_CARD_TEXT);
+    g_st7789.setCursor(x + 4, y + 4);
+    g_st7789.print(static_cast<char>('A' + item.source_index));
+    g_st7789.print(":");
+    g_st7789.print(item.short_label);
+
+    g_st7789.setCursor(x + 4, y + 16);
+    if (item.has_value_text) {
+      g_st7789.print(item.value_text);
+      g_st7789.print(" (");
+      g_st7789.print(item.value);
+      g_st7789.print(")");
+    } else {
+      g_st7789.print(item.value);
+    }
+
+    if (item.type == PRA32_U2_UI_FocusItemType_Parameter) {
+      const int bar_x = x + 4;
+      const int bar_y = y + 32;
+      const int bar_w = w - 8;
+      const int fill_w = (bar_w * item.value) / 127;
+      g_st7789.drawRect(bar_x, bar_y, bar_w, 6, item.focused ? COLOR_FOCUS_TEXT : border_color);
+      g_st7789.fillRect(bar_x + 1, bar_y + 1, fill_w, 4, item.focused ? COLOR_FOCUS_TEXT : border_color);
+    } else if (frame.state == PRA32_U2_UI_State_ActionConfirm && item.focused) {
+      g_st7789.setCursor(x + 4, y + 31);
+      g_st7789.print(frame.confirm_selected ? "[YES] no " : " yes [NO]");
+    }
   }
+
+  draw_confirm_overlay(frame, redraw_overlay);
+
+  if (redraw_footer) {
+    draw_footer_help(frame.state, frame.confirm_selected);
+  }
+
+  g_prev_frame = frame;
+  g_prev_frame_valid = true;
 }
 
 #else
