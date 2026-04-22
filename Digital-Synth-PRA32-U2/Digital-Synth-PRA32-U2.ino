@@ -78,13 +78,23 @@
 #define PRA32_U2_ANALOG_INPUT_DENOMINATOR        (480)
 #define PRA32_U2_ANALOG_INPUT_THRESHOLD          (PRA32_U2_ANALOG_INPUT_DENOMINATOR)
 
-#define PRA32_U2_USE_CONTROL_PANEL_OLED_DISPLAY  // Use SSD1306 monochrome 128x64 OLED
+//#define PRA32_U2_USE_CONTROL_PANEL_OLED_DISPLAY  // Legacy SSD1306 monochrome 128x64 OLED
 #define PRA32_U2_OLED_DISPLAY_I2C                (i2c1)
 #define PRA32_U2_OLED_DISPLAY_I2C_SDA_PIN        (6)
 #define PRA32_U2_OLED_DISPLAY_I2C_SCL_PIN        (7)
 #define PRA32_U2_OLED_DISPLAY_I2C_ADDRESS        (0x3C)
 #define PRA32_U2_OLED_DISPLAY_CONTRAST           (0xFF)
 #define PRA32_U2_OLED_DISPLAY_ROTATION           (true)
+
+#define PRA32_U2_USE_CONTROL_PANEL_ST7789_DISPLAY  // New color display backend
+#define PRA32_U2_ST7789_WIDTH                      (284)
+#define PRA32_U2_ST7789_HEIGHT                     (76)
+#define PRA32_U2_ST7789_ROTATION                   (1)   // Landscape
+#define PRA32_U2_ST7789_PIN_SCK                    (2)   // Hardware mapping placeholder
+#define PRA32_U2_ST7789_PIN_MOSI                   (3)   // Hardware mapping placeholder
+#define PRA32_U2_ST7789_PIN_CS                     (17)  // Hardware mapping placeholder
+#define PRA32_U2_ST7789_PIN_DC                     (8)   // Hardware mapping placeholder
+#define PRA32_U2_ST7789_PIN_RST                    (12)  // Hardware mapping placeholder
 
 #define PRA32_U2_DISABLE_USB_MIDI_TRANSMITTION
 
