@@ -201,6 +201,9 @@ void PRA32_U2_UI_RenderST7789_draw(const PRA32_U2_UI_RenderFrame& frame) {
   for (uint8_t index = 0; index < 3; ++index) {
     const PRA32_U2_UI_RenderItem& item = frame.items[index];
     bool redraw_card = redraw_main_base || !same_item(item, g_prev_frame.items[index]);
+    if (!redraw_card && item.focused) {
+      redraw_card = (frame.state != g_prev_frame.state) || (frame.confirm_selected != g_prev_frame.confirm_selected);
+    }
     if (!redraw_card) {
       continue;
     }
