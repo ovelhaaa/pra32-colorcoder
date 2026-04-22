@@ -50,7 +50,7 @@
 
 ////////////////////////////////////////////////////////////////
 
-//#define PRA32_U2_USE_CONTROL_PANEL               // PRA32-U2/P (PRA32-U2 with Panel)
+#define PRA32_U2_USE_CONTROL_PANEL               // PRA32-U2/P (PRA32-U2 with Panel)
 
 #define PRA32_U2_USE_CONTROL_PANEL_KEY_INPUT     // Use tactile switches
 #define PRA32_U2_USE_CONTROL_PANEL_ENCODER_INPUT // New single-encoder path
