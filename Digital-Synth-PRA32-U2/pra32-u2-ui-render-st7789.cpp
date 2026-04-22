@@ -141,12 +141,10 @@ void draw_confirm_overlay(const PRA32_U2_UI_RenderFrame& frame, bool redraw) {
     return;
   }
 
-  g_st7789.fillRect(0, OVERLAY_Y, DISPLAY_WIDTH, OVERLAY_HEIGHT, COLOR_BLACK);
-  if (!has_confirm_overlay(frame)) {
-    return;
+  uint16_t overlay_color = COLOR_BLACK;
+  if (has_confirm_overlay(frame)) {
+    overlay_color = frame.confirm_selected ? COLOR_DANGER : COLOR_CARD_BG_ACTION;
   }
-
-  const uint16_t overlay_color = frame.confirm_selected ? COLOR_DANGER : COLOR_CARD_BG_ACTION;
   g_st7789.fillRect(0, OVERLAY_Y, DISPLAY_WIDTH, OVERLAY_HEIGHT, overlay_color);
 }
 

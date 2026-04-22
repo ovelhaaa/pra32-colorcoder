@@ -63,6 +63,10 @@ static INLINE void PRA32_U2_ControlPanel_build_short_label(const char line0[11],
 static INLINE void PRA32_U2_ControlPanel_build_st7789_frame(PRA32_U2_UI_RenderFrame& frame);
 static INLINE void PRA32_U2_ControlPanel_request_st7789_redraw();
 static INLINE bool PRA32_U2_ControlPanel_st7789_target_is_visible(uint8_t target);
+static INLINE bool PRA32_U2_ControlPanel_consume_st7789_redraw_request();
+
+static volatile bool s_st7789_redraw_requested = true;
+static uint8_t s_st7789_visible_targets[3] = {0xFF, 0xFF, 0xFF};
 
 
 static INLINE void PRA32_U2_ControlPanel_update_page() {
@@ -84,15 +88,20 @@ static INLINE void PRA32_U2_ControlPanel_update_page() {
   std::memcpy(&s_display_buffer[5][ 0], current_page.control_target_a_name_line_0, 10);
   std::memcpy(&s_display_buffer[6][ 0], current_page.control_target_a_name_line_1, 10);
   s_adc_control_target[0]             = current_page.control_target_a;
+  s_st7789_visible_targets[0]         = current_page.control_target_a;
 
   std::memcpy(&s_display_buffer[5][11], current_page.control_target_b_name_line_0, 10);
   std::memcpy(&s_display_buffer[6][11], current_page.control_target_b_name_line_1, 10);
   s_adc_control_target[1]             = current_page.control_target_b;
+  s_st7789_visible_targets[1]         = current_page.control_target_b;
 
 #if defined(PRA32_U2_KEY_INPUT_PLAY_KEY_PIN)
   std::memcpy(&s_display_buffer[1][11], current_page.control_target_c_name_line_0, 10);
   std::memcpy(&s_display_buffer[2][11], current_page.control_target_c_name_line_1, 10);
   s_adc_control_target[2]             = current_page.control_target_c;
+  s_st7789_visible_targets[2]         = current_page.control_target_c;
+#else
+  s_st7789_visible_targets[2]         = current_page.control_target_c;
 #endif  // defined(PRA32_U2_KEY_INPUT_PLAY_KEY_PIN)
 
 #if (PRA32_U2_NUMBER_OF_SYNTHS > 1)
@@ -572,22 +581,18 @@ static INLINE void PRA32_U2_ControlPanel_build_short_label(const char line0[11],
   }
 }
 
-static volatile bool s_st7789_redraw_requested = true;
-
 static INLINE void PRA32_U2_ControlPanel_request_st7789_redraw() {
-  s_st7789_redraw_requested = true;
+  __atomic_store_n(&s_st7789_redraw_requested, true, __ATOMIC_RELEASE);
+}
+
+static INLINE bool PRA32_U2_ControlPanel_consume_st7789_redraw_request() {
+  return __atomic_exchange_n(&s_st7789_redraw_requested, false, __ATOMIC_ACQ_REL);
 }
 
 static INLINE bool PRA32_U2_ControlPanel_st7789_target_is_visible(uint8_t target) {
-  PRA32_U2_ControlPanelPage current_page = g_control_panel_page_table[s_current_page_group][s_current_page_index[s_current_page_group]];
-  uint8_t target_c = current_page.control_target_c;
-  if (s_play_mode == 1) {
-    target_c = SEQ_PIT_OFST;
-  }
-
-  return (current_page.control_target_a == target) ||
-         (current_page.control_target_b == target) ||
-         (target_c == target);
+  return (s_st7789_visible_targets[0] == target) ||
+         (s_st7789_visible_targets[1] == target) ||
+         (s_st7789_visible_targets[2] == target);
 }
 
 static INLINE void PRA32_U2_ControlPanel_build_st7789_frame(PRA32_U2_UI_RenderFrame& frame) {
@@ -1421,11 +1426,10 @@ INLINE void PRA32_U2_ControlPanel_update_display(uint32_t loop_counter) {
 #endif  // defined(PRA32_U2_USE_CONTROL_PANEL_OLED_DISPLAY)
 
 #if defined(PRA32_U2_USE_CONTROL_PANEL_ST7789_DISPLAY)
-  if (s_st7789_redraw_requested) {
+  if (PRA32_U2_ControlPanel_consume_st7789_redraw_request()) {
     PRA32_U2_UI_RenderFrame frame = {};
     PRA32_U2_ControlPanel_build_st7789_frame(frame);
     PRA32_U2_UI_RenderST7789_draw(frame);
-    s_st7789_redraw_requested = false;
   }
 #endif  // defined(PRA32_U2_USE_CONTROL_PANEL_ST7789_DISPLAY)
 
