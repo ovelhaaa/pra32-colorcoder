@@ -611,10 +611,15 @@ static INLINE bool PRA32_U2_ControlPanel_same_focus_item(const PRA32_U2_UI_Focus
 }
 
 static INLINE void PRA32_U2_ControlPanel_copy_page_name(char out[22], const char line0[11], const char line1[11]) {
-  std::memset(out, 0, 22);
-  std::memcpy(&out[0], line0, 10);
+  for (uint8_t i = 0; i < 10; ++i) {
+    char c = line0[i];
+    out[i] = (c == '\0') ? ' ' : c;
+  }
   out[10] = ' ';
-  std::memcpy(&out[11], line1, 10);
+  for (uint8_t i = 0; i < 10; ++i) {
+    char c = line1[i];
+    out[11 + i] = (c == '\0') ? ' ' : c;
+  }
   out[21] = '\0';
 }
 
