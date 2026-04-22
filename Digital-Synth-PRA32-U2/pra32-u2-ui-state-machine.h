@@ -19,6 +19,7 @@ enum PRA32_U2_UI_FocusItemType {
 };
 
 struct PRA32_U2_UI_FocusItem {
+  uint8_t source_index;
   uint8_t target;
   PRA32_U2_UI_FocusItemType type;
 };

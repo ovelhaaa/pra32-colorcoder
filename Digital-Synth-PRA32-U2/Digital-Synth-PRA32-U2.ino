@@ -66,7 +66,7 @@
 #define PRA32_U2_KEY_LONG_PRESS_WAIT             (375)
 #define PRA32_U2_ENCODER_PIN_A                   (14)  // Hardware placeholder
 #define PRA32_U2_ENCODER_PIN_B                   (15)  // Hardware placeholder
-#define PRA32_U2_ENCODER_SWITCH_PIN              (16)  // Hardware placeholder
+#define PRA32_U2_ENCODER_SWITCH_PIN              (21)  // Hardware placeholder
 #define PRA32_U2_ENCODER_ACTIVE_LEVEL            (LOW)
 #define PRA32_U2_ENCODER_PIN_MODE                (INPUT_PULLUP)
 #define PRA32_U2_ENCODER_DEBOUNCE_TICKS          (15)

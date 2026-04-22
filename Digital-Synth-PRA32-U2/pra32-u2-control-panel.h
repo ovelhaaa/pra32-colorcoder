@@ -661,12 +661,7 @@ INLINE void PRA32_U2_ControlPanel_update_control() {
                                          PRA32_U2_ControlPanel_set_target_value,
                                          PRA32_U2_ControlPanel_execute_action_target,
                                          PRA32_U2_ControlPanel_update_page);
-
-  PRA32_U2_UI_FocusItem focus_item = PRA32_U2_UI_StateMachine_focused_item();
-  s_adc_control_target[0] = focus_item.target;
-  s_adc_control_target[1] = 0xFF;
-  s_adc_control_target[2] = 0xFF;
-#else
+#endif
 #if defined(PRA32_U2_USE_CONTROL_PANEL_KEY_INPUT)
   static uint32_t s_prev_key_value_changed_time = 0;
   static uint32_t s_next_key_value_changed_time = 0;
@@ -996,7 +991,6 @@ INLINE void PRA32_U2_ControlPanel_update_control() {
     }
   }
 #endif  // defined(PRA32_U2_USE_CONTROL_PANEL_ANALOG_INPUT)
-#endif  // defined(PRA32_U2_USE_CONTROL_PANEL_ENCODER_INPUT)
 
 #endif  // defined(PRA32_U2_USE_CONTROL_PANEL)
 }
@@ -1042,6 +1036,7 @@ INLINE void PRA32_U2_ControlPanel_update_display_buffer(uint32_t loop_counter) {
 
 #if defined(PRA32_U2_USE_CONTROL_PANEL_ENCODER_INPUT)
     PRA32_U2_UI_StateSnapshot snapshot = PRA32_U2_UI_StateMachine_snapshot();
+    PRA32_U2_UI_FocusItem focus_item = PRA32_U2_UI_StateMachine_focused_item();
     const char* state_text = "GROUP";
     switch (snapshot.state) {
     case PRA32_U2_UI_State_GroupNavigation: state_text = "GROUP"; break;
@@ -1054,9 +1049,16 @@ INLINE void PRA32_U2_ControlPanel_update_display_buffer(uint32_t loop_counter) {
     std::memcpy(&s_display_buffer[0][3], state_text, 5);
     s_display_buffer[0][8] = snapshot.confirm_selected ? 'Y' : 'N';
     s_display_buffer[0][9] = ' ';
-
-    std::memset(&s_display_buffer[7][11], ' ', 10);
-    std::memset(&s_display_buffer[3][11], ' ', 10);
+    s_display_buffer[5][10] = ' ';
+    s_display_buffer[5][20] = ' ';
+    s_display_buffer[1][20] = ' ';
+    if (focus_item.source_index == 0) {
+      s_display_buffer[5][10] = '>';
+    } else if (focus_item.source_index == 1) {
+      s_display_buffer[5][20] = '>';
+    } else if (focus_item.source_index == 2) {
+      s_display_buffer[1][20] = '>';
+    }
 #endif
 
     uint8_t adc_control_target_0 = s_adc_control_target[0];

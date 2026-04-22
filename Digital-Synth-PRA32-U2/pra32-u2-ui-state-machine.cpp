@@ -51,6 +51,7 @@ static void PRA32_U2_UI_StateMachine_rebuild_items() {
   for (uint8_t i = 0; i < 3; ++i) {
     PRA32_U2_UI_FocusItemType type = PRA32_U2_UI_StateMachine_item_type(targets[i]);
     if (type != PRA32_U2_UI_FocusItemType_None) {
+      s_items[s_item_count].source_index = i;
       s_items[s_item_count].target = targets[i];
       s_items[s_item_count].type = type;
       ++s_item_count;
@@ -118,6 +119,10 @@ void PRA32_U2_UI_StateMachine_process_event(const PRA32_U2_UI_EncoderInputEvent&
                                             PRA32_U2_UI_StateMachine_SetValueFn set_value,
                                             PRA32_U2_UI_StateMachine_ExecuteActionFn execute_action,
                                             PRA32_U2_UI_StateMachine_OnPageChangedFn on_page_changed) {
+  if (event.rotation_delta == 0 && !event.short_click && !event.long_click) {
+    return;
+  }
+
   PRA32_U2_UI_StateMachine_rebuild_items();
 
   switch (s_state) {
@@ -207,7 +212,7 @@ PRA32_U2_UI_StateSnapshot PRA32_U2_UI_StateMachine_snapshot() {
 }
 
 PRA32_U2_UI_FocusItem PRA32_U2_UI_StateMachine_focused_item() {
-  PRA32_U2_UI_FocusItem item = {0xFF, PRA32_U2_UI_FocusItemType_None};
+  PRA32_U2_UI_FocusItem item = {0xFF, 0xFF, PRA32_U2_UI_FocusItemType_None};
   if (s_item_count > 0) {
     item = s_items[s_item_index];
   }
