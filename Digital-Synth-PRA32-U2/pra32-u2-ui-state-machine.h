@@ -45,3 +45,4 @@ void PRA32_U2_UI_StateMachine_process_event(const PRA32_U2_UI_EncoderInputEvent&
 
 PRA32_U2_UI_StateSnapshot PRA32_U2_UI_StateMachine_snapshot();
 PRA32_U2_UI_FocusItem PRA32_U2_UI_StateMachine_focused_item();
+bool PRA32_U2_UI_StateMachine_is_dangerous_action_target(uint8_t target);
