@@ -595,6 +595,29 @@ static INLINE bool PRA32_U2_ControlPanel_st7789_target_is_visible(uint8_t target
          (s_st7789_visible_targets[2] == target);
 }
 
+static INLINE bool PRA32_U2_ControlPanel_same_ui_snapshot(const PRA32_U2_UI_StateSnapshot& a,
+                                                           const PRA32_U2_UI_StateSnapshot& b) {
+  return (a.state == b.state) &&
+         (a.focused_item_index == b.focused_item_index) &&
+         (a.focused_item_count == b.focused_item_count) &&
+         (a.confirm_selected == b.confirm_selected);
+}
+
+static INLINE bool PRA32_U2_ControlPanel_same_focus_item(const PRA32_U2_UI_FocusItem& a,
+                                                         const PRA32_U2_UI_FocusItem& b) {
+  return (a.source_index == b.source_index) &&
+         (a.target == b.target) &&
+         (a.type == b.type);
+}
+
+static INLINE void PRA32_U2_ControlPanel_copy_page_name(char out[22], const char line0[11], const char line1[11]) {
+  std::memset(out, 0, 22);
+  std::memcpy(&out[0], line0, 10);
+  out[10] = ' ';
+  std::memcpy(&out[11], line1, 10);
+  out[21] = '\0';
+}
+
 static INLINE void PRA32_U2_ControlPanel_build_st7789_frame(PRA32_U2_UI_RenderFrame& frame) {
   std::memset(&frame, 0, sizeof(frame));
 
@@ -609,16 +632,17 @@ static INLINE void PRA32_U2_ControlPanel_build_st7789_frame(PRA32_U2_UI_RenderFr
   frame.page_index = static_cast<uint8_t>(s_current_page_index[s_current_page_group]);
   frame.page_count = static_cast<uint8_t>(g_number_of_pages[s_current_page_group]);
 
-  std::snprintf(frame.page_name, sizeof(frame.page_name), "%-10.10s %-10.10s",
-                current_page.page_name_line_0, current_page.page_name_line_1);
-  std::snprintf(frame.mode_text, sizeof(frame.mode_text), "%s", s_play_mode == 1 ? "Seq" : "Nrm");
+  PRA32_U2_ControlPanel_copy_page_name(frame.page_name,
+                                       current_page.page_name_line_0,
+                                       current_page.page_name_line_1);
+  std::memcpy(frame.mode_text, (s_play_mode == 1) ? "Seq" : "Nrm", 4);
 
   if (s_playing_status == PlayingStatus_Seq) {
-    std::snprintf(frame.status_text, sizeof(frame.status_text), "RUN");
+    std::memcpy(frame.status_text, "RUN", 4);
   } else if (s_playing_status == PlayingStatus_Playing) {
-    std::snprintf(frame.status_text, sizeof(frame.status_text), "PLY");
+    std::memcpy(frame.status_text, "PLY", 4);
   } else {
-    std::snprintf(frame.status_text, sizeof(frame.status_text), "STP");
+    std::memcpy(frame.status_text, "STP", 4);
   }
 
   PRA32_U2_UI_StateSnapshot snapshot = PRA32_U2_UI_StateMachine_snapshot();
@@ -675,109 +699,6 @@ static INLINE void PRA32_U2_ControlPanel_build_st7789_frame(PRA32_U2_UI_RenderFr
   }
 }
 
-static INLINE void PRA32_U2_ControlPanel_build_short_label(const char line0[11], const char line1[11], char out[11]) {
-  const char* source = line1;
-  bool line1_has_text = false;
-  for (uint8_t i = 0; i < 10; ++i) {
-    if ((line1[i] != ' ') && (line1[i] != '\0')) {
-      line1_has_text = true;
-      break;
-    }
-  }
-  if (!line1_has_text) {
-    source = line0;
-  }
-
-  uint8_t end = 10;
-  while ((end > 0) && ((source[end - 1] == ' ') || (source[end - 1] == '\0'))) {
-    --end;
-  }
-
-  std::memset(out, 0, 11);
-  for (uint8_t i = 0; i < end; ++i) {
-    out[i] = source[i];
-  }
-}
-
-static INLINE void PRA32_U2_ControlPanel_build_st7789_frame(PRA32_U2_UI_RenderFrame& frame) {
-  std::memset(&frame, 0, sizeof(frame));
-
-  PRA32_U2_ControlPanelPage current_page = g_control_panel_page_table[s_current_page_group][s_current_page_index[s_current_page_group]];
-  if (s_play_mode == 1) {
-    std::memcpy(current_page.control_target_c_name_line_0, "Seq       ", 10);
-    std::memcpy(current_page.control_target_c_name_line_1, "Pitch Ofst", 10);
-    current_page.control_target_c = SEQ_PIT_OFST;
-  }
-
-  frame.page_group = static_cast<uint8_t>(s_current_page_group);
-  frame.page_index = static_cast<uint8_t>(s_current_page_index[s_current_page_group]);
-  frame.page_count = static_cast<uint8_t>(g_number_of_pages[s_current_page_group]);
-
-  std::snprintf(frame.page_name, sizeof(frame.page_name), "%-10.10s %-10.10s",
-                current_page.page_name_line_0, current_page.page_name_line_1);
-  std::snprintf(frame.mode_text, sizeof(frame.mode_text), "%s", s_play_mode == 1 ? "Seq" : "Nrm");
-
-  if (s_playing_status == PlayingStatus_Seq) {
-    std::snprintf(frame.status_text, sizeof(frame.status_text), "RUN");
-  } else if (s_playing_status == PlayingStatus_Playing) {
-    std::snprintf(frame.status_text, sizeof(frame.status_text), "PLY");
-  } else {
-    std::snprintf(frame.status_text, sizeof(frame.status_text), "STP");
-  }
-
-  PRA32_U2_UI_StateSnapshot snapshot = PRA32_U2_UI_StateMachine_snapshot();
-  PRA32_U2_UI_FocusItem focused_item = PRA32_U2_UI_StateMachine_focused_item();
-  frame.state = snapshot.state;
-  frame.confirm_selected = snapshot.confirm_selected;
-
-  const uint8_t targets[3] = {
-    current_page.control_target_a,
-    current_page.control_target_b,
-    current_page.control_target_c
-  };
-  const char* line0[3] = {
-    current_page.control_target_a_name_line_0,
-    current_page.control_target_b_name_line_0,
-    current_page.control_target_c_name_line_0
-  };
-  const char* line1[3] = {
-    current_page.control_target_a_name_line_1,
-    current_page.control_target_b_name_line_1,
-    current_page.control_target_c_name_line_1
-  };
-
-  for (uint8_t i = 0; i < 3; ++i) {
-    PRA32_U2_UI_RenderItem& item = frame.items[i];
-    item.visible = (targets[i] != 0xFF);
-    item.source_index = i;
-    item.target = targets[i];
-    item.focused = (snapshot.focused_item_count > 0) &&
-                   (snapshot.focused_item_index < snapshot.focused_item_count) &&
-                   (focused_item.source_index == i);
-
-    if (!item.visible) {
-      continue;
-    }
-
-    item.type = focused_item.type;
-    if (!item.focused) {
-      if (PRA32_U2_UI_StateMachine_is_dangerous_action_target(targets[i])) {
-        item.type = PRA32_U2_UI_FocusItemType_Action;
-      } else {
-        item.type = PRA32_U2_UI_FocusItemType_Parameter;
-      }
-    }
-
-    item.value = PRA32_U2_ControlPanel_get_target_value(targets[i]);
-    char value_display_text[5] = {};
-    item.has_value_text = PRA32_U2_ControlPanel_calc_value_display(targets[i], item.value, value_display_text);
-    if (item.has_value_text) {
-      std::memcpy(item.value_text, value_display_text, sizeof(item.value_text));
-    }
-
-    PRA32_U2_ControlPanel_build_short_label(line0[i], line1[i], item.short_label);
-  }
-}
 
 INLINE void PRA32_U2_ControlPanel_setup() {
   s_current_program[0] = (PROGRAM_NUMBER_DEFAULT + ((PRA32_U2_NUMBER_OF_SYNTHS > 1) * 4) + 0) & USER_PROGRAM_NUMBER_MAX;
@@ -901,14 +822,28 @@ INLINE void PRA32_U2_ControlPanel_update_control() {
 
 #if defined(PRA32_U2_USE_CONTROL_PANEL_ENCODER_INPUT)
   PRA32_U2_UI_EncoderInputEvent event = PRA32_U2_UI_EncoderInput_poll();
-  if ((event.rotation_delta != 0) || event.short_click || event.long_click) {
-    PRA32_U2_ControlPanel_request_st7789_redraw();
-  }
+  PRA32_U2_UI_StateSnapshot snapshot_before = PRA32_U2_UI_StateMachine_snapshot();
+  PRA32_U2_UI_FocusItem focus_before = PRA32_U2_UI_StateMachine_focused_item();
+  uint32_t page_group_before = s_current_page_group;
+  uint32_t page_index_before = s_current_page_index[s_current_page_group];
+
   PRA32_U2_UI_StateMachine_process_event(event,
                                          PRA32_U2_ControlPanel_get_target_value,
                                          PRA32_U2_ControlPanel_set_target_value,
                                          PRA32_U2_ControlPanel_execute_action_target,
                                          PRA32_U2_ControlPanel_update_page);
+
+  PRA32_U2_UI_StateSnapshot snapshot_after = PRA32_U2_UI_StateMachine_snapshot();
+  PRA32_U2_UI_FocusItem focus_after = PRA32_U2_UI_StateMachine_focused_item();
+  uint32_t page_group_after = s_current_page_group;
+  uint32_t page_index_after = s_current_page_index[s_current_page_group];
+
+  if (!PRA32_U2_ControlPanel_same_ui_snapshot(snapshot_before, snapshot_after) ||
+      !PRA32_U2_ControlPanel_same_focus_item(focus_before, focus_after) ||
+      (page_group_before != page_group_after) ||
+      (page_index_before != page_index_after)) {
+    PRA32_U2_ControlPanel_request_st7789_redraw();
+  }
 #endif
 #if defined(PRA32_U2_USE_CONTROL_PANEL_KEY_INPUT)
   static uint32_t s_prev_key_value_changed_time = 0;
