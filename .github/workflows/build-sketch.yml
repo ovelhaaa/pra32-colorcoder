@@ -26,8 +26,9 @@ jobs:
           libraries: |
             - name: MIDI Library
               version: 5.0.2
-            - source-path: ./Digital-Synth-PRA32-U2
-              destination-name: pra32_u2_shared
+          cli-compile-flags: |
+            - --library
+            - Digital-Synth-PRA32-U2
           sketch-paths: |
             - Digital-Synth-PRA32-U2
             - Digital-Synth-PRA32-U2-M
