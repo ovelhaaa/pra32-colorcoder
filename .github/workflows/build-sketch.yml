@@ -1,0 +1,65 @@
+name: Build Sketch
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/build-sketch.yml'
+      - 'Digital-Synth-PRA32-U2/**'
+      - 'Digital-Synth-PRA32-U2-M/**'
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - '.github/workflows/build-sketch.yml'
+      - 'Digital-Synth-PRA32-U2/**'
+      - 'Digital-Synth-PRA32-U2-M/**'
+  workflow_dispatch:
+
+concurrency:
+  group: build-sketch-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compile-sketch:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sketch: Digital-Synth-PRA32-U2
+            extra_args: ""
+          - sketch: Digital-Synth-PRA32-U2-M
+            extra_args: "--library Digital-Synth-PRA32-U2"
+
+    env:
+      FQBN: rp2040:rp2040:rpipico2:usbstack=tinyusb
+      RP2040_INDEX_URL: https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Arduino CLI
+        uses: arduino/setup-arduino-cli@v2
+
+      - name: Cache Arduino directories
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.arduino15
+            ~/Arduino
+          key: arduino-${{ runner.os }}-rp2040-5.5.1-midi-5.0.2
+
+      - name: Install platform and libraries
+        run: |
+          arduino-cli core update-index --additional-urls "$RP2040_INDEX_URL"
+          arduino-cli core install rp2040:rp2040@5.5.1 --additional-urls "$RP2040_INDEX_URL"
+          arduino-cli lib install "MIDI Library@5.0.2"
+
+      - name: Compile ${{ matrix.sketch }}
+        run: |
+          arduino-cli compile \
+            --fqbn "$FQBN" \
+            ${{ matrix.extra_args }} \
+            "${{ matrix.sketch }}"
