@@ -1,0 +1,32 @@
+name: Build Sketch
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  compile-sketch:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compile Arduino sketches
+        uses: arduino/compile-sketches@v1
+        with:
+          fqbn: rp2040:rp2040:rpipico2
+          platforms: |
+            - name: rp2040:rp2040
+              version: 5.5.1
+              source-url: https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json
+          libraries: |
+            - name: MIDI Library
+              version: 5.0.2
+          sketch-paths: |
+            - Digital-Synth-PRA32-U2
+            - Digital-Synth-PRA32-U2-M
+          enable-deltas-report: true
