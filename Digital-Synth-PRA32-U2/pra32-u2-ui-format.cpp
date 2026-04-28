@@ -2,14 +2,11 @@
 
 #include <cstdio>
 #include <cstring>
-#include "pra32-u2-synth.h"
 
-extern PRA32_U2_Synth<> g_synth;
-
-
+extern uint8_t PRA32_U2_UI_get_current_controller_value(uint8_t control_number);
 uint8_t PRA32_U2_ControlPanel_get_index_scale()
 {
-  uint8_t controller_value = g_synth.current_controller_value(PANEL_SCALE    );
+  uint8_t controller_value = PRA32_U2_UI_get_current_controller_value(PANEL_SCALE    );
   uint8_t index_scale = ((controller_value * 10) + 127) / 254;
   return index_scale;
 }
@@ -100,8 +97,8 @@ void PRA32_U2_ControlPanel_calc_value_display_pitch(uint8_t pitch, char value_di
 {
   uint8_t index_scale = PRA32_U2_ControlPanel_get_index_scale();
   uint8_t new_pitch   = PRA32_U2_ControlPanel_calc_scaled_pitch(
-                          index_scale, pitch, g_synth.current_controller_value(PANEL_PIT_OFST ) - 64,
-                                              g_synth.current_controller_value(SEQ_PIT_OFST   ) - 64);
+                          index_scale, pitch, PRA32_U2_UI_get_current_controller_value(PANEL_PIT_OFST ) - 64,
+                                              PRA32_U2_UI_get_current_controller_value(SEQ_PIT_OFST   ) - 64);
 
   if (new_pitch == 0xFF) {
     value_display_text[0] = 'O';
@@ -112,7 +109,7 @@ void PRA32_U2_ControlPanel_calc_value_display_pitch(uint8_t pitch, char value_di
   }
 
   new_pitch = PRA32_U2_ControlPanel_calc_transposed_pitch(
-    new_pitch, g_synth.current_controller_value(PANEL_TRANSPOSE ) - 64);
+    new_pitch, PRA32_U2_UI_get_current_controller_value(PANEL_TRANSPOSE ) - 64);
 
   static const char ary[12][5] = { " C", "C#", " D", "D#", " E", " F", "F#", " G", "G#", " A", "A#", " B" };
 
@@ -388,7 +385,7 @@ boolean PRA32_U2_ControlPanel_calc_value_display(uint8_t control_target, uint8_t
     break;
   case SEQ_TEMPO      :
     {
-      uint32_t bpm = PRA32_U2_ControlPanel_calc_bpm(g_synth.current_controller_value(SEQ_TEMPO      ));
+      uint32_t bpm = PRA32_U2_ControlPanel_calc_bpm(PRA32_U2_UI_get_current_controller_value(SEQ_TEMPO      ));
       std::snprintf(value_display_text, 5, "%3lu", bpm);
       result = true;
     }
@@ -428,7 +425,7 @@ boolean PRA32_U2_ControlPanel_calc_value_display(uint8_t control_target, uint8_t
     break;
   case SEQ_NUM_STEPS  :
     {
-      int32_t last_step = g_synth.current_controller_value(SEQ_NUM_STEPS  );
+      int32_t last_step = PRA32_U2_UI_get_current_controller_value(SEQ_NUM_STEPS  );
       last_step = (last_step - 2) >> 2;
       if (last_step < 0) { last_step = 0; }
       std::snprintf(value_display_text, 5, "%3ld", last_step + 1);
@@ -445,21 +442,21 @@ boolean PRA32_U2_ControlPanel_calc_value_display(uint8_t control_target, uint8_t
     break;
   case SEQ_ON_STEPS   :
     {
-      uint8_t on_steps = g_synth.current_controller_value(SEQ_ON_STEPS   );
+      uint8_t on_steps = PRA32_U2_UI_get_current_controller_value(SEQ_ON_STEPS   );
       std::snprintf(value_display_text, 5, "x%02X", on_steps);
       result = true;
     }
     break;
   case SEQ_ACT_STEPS  :
     {
-      uint8_t act_steps = g_synth.current_controller_value(SEQ_ACT_STEPS  );
+      uint8_t act_steps = PRA32_U2_UI_get_current_controller_value(SEQ_ACT_STEPS  );
       std::snprintf(value_display_text, 5, "x%02X", act_steps);
       result = true;
     }
     break;
   case PANEL_MIDI_CH  :
     {
-      uint8_t midi_ch = g_synth.current_controller_value(PANEL_MIDI_CH  ) >> 3;
+      uint8_t midi_ch = PRA32_U2_UI_get_current_controller_value(PANEL_MIDI_CH  ) >> 3;
       std::snprintf(value_display_text, 5, "%3d", midi_ch + 1);
       result = true;
     }

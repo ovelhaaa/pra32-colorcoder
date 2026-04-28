@@ -449,6 +449,11 @@ void __not_in_flash_func(handleStop)()
 
 #if defined(PRA32_U2_USE_CONTROL_PANEL)
 
+uint8_t __not_in_flash_func(PRA32_U2_UI_get_current_controller_value)(uint8_t control_number)
+{
+  return g_synth.current_controller_value(control_number);
+}
+
 uint8_t __not_in_flash_func(getCurrentControllerValue)(byte channel, byte number)
 {
   if ((channel - 1) == g_midi_ch) {
