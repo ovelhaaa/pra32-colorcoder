@@ -101,7 +101,7 @@ static const PRA32_U2_ControlPanelPage g_control_panel_page_table_d[] = {
   { "Page=D-08 ", "Read a    ",   "Read      ", "Panel Prms", RD_PANEL_PRMS  ,   "Init      ", "Panel Prms", IN_PANEL_PRMS  ,   "Panel     ", "Play Pitch", PANEL_PLAY_PIT , },
 };
 
-static const PRA32_U2_ControlPanelPage* const g_control_panel_page_table[] = {
+inline const PRA32_U2_ControlPanelPage* const g_control_panel_page_table[] = {
     g_control_panel_page_table_a,
     g_control_panel_page_table_b,
     g_control_panel_page_table_c,
