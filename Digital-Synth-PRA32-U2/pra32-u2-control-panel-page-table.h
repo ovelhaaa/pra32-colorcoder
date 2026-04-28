@@ -101,14 +101,14 @@ static const PRA32_U2_ControlPanelPage g_control_panel_page_table_d[] = {
   { "Page=D-08 ", "Read a    ",   "Read      ", "Panel Prms", RD_PANEL_PRMS  ,   "Init      ", "Panel Prms", IN_PANEL_PRMS  ,   "Panel     ", "Play Pitch", PANEL_PLAY_PIT , },
 };
 
-const PRA32_U2_ControlPanelPage* g_control_panel_page_table[] = {
+static const PRA32_U2_ControlPanelPage* const g_control_panel_page_table[] = {
     g_control_panel_page_table_a,
     g_control_panel_page_table_b,
     g_control_panel_page_table_c,
     g_control_panel_page_table_d,
 };
 
-uint32_t g_number_of_pages[] = {
+static const uint32_t g_number_of_pages[] = {
     (sizeof(g_control_panel_page_table_a) / sizeof(g_control_panel_page_table_a[0])),
     (sizeof(g_control_panel_page_table_b) / sizeof(g_control_panel_page_table_b[0])),
     (sizeof(g_control_panel_page_table_c) / sizeof(g_control_panel_page_table_c[0])),
