@@ -2,6 +2,10 @@
 
 #include <cstdio>
 #include <cstring>
+#include "pra32-u2-synth.h"
+
+extern PRA32_U2_Synth<> g_synth;
+
 
 uint8_t PRA32_U2_ControlPanel_get_index_scale()
 {
