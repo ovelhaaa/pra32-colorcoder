@@ -108,7 +108,7 @@ static const PRA32_U2_ControlPanelPage* const g_control_panel_page_table[] = {
     g_control_panel_page_table_d,
 };
 
-static const uint32_t g_number_of_pages[] = {
+inline const uint32_t g_number_of_pages[] = {
     (sizeof(g_control_panel_page_table_a) / sizeof(g_control_panel_page_table_a[0])),
     (sizeof(g_control_panel_page_table_b) / sizeof(g_control_panel_page_table_b[0])),
     (sizeof(g_control_panel_page_table_c) / sizeof(g_control_panel_page_table_c[0])),
