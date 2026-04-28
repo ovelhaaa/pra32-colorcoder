@@ -1,5 +1,8 @@
 #pragma once
 
+#include <Arduino.h>
+
+#include "pra32-u2-build-config.h"
 #include "pra32-u2-constants.h"
 
 #define INLINE inline __attribute__((always_inline))
