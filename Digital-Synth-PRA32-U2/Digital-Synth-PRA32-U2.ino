@@ -90,11 +90,11 @@
 #define PRA32_U2_ST7789_WIDTH                      (284)
 #define PRA32_U2_ST7789_HEIGHT                     (76)
 #define PRA32_U2_ST7789_ROTATION                   (1)   // Landscape
-#define PRA32_U2_ST7789_PIN_SCK                    (2)   // Hardware mapping placeholder
-#define PRA32_U2_ST7789_PIN_MOSI                   (3)   // Hardware mapping placeholder
-#define PRA32_U2_ST7789_PIN_CS                     (17)  // Hardware mapping placeholder
-#define PRA32_U2_ST7789_PIN_DC                     (8)   // Hardware mapping placeholder
-#define PRA32_U2_ST7789_PIN_RST                    (12)  // Hardware mapping placeholder
+#define PRA32_U2_ST7789_PIN_SCK                    (2)   // Waveshare RP2350 Zero mapping
+#define PRA32_U2_ST7789_PIN_MOSI                   (3)   // Waveshare RP2350 Zero mapping
+#define PRA32_U2_ST7789_PIN_CS                     (17)  // Waveshare RP2350 Zero mapping
+#define PRA32_U2_ST7789_PIN_DC                     (8)   // Waveshare RP2350 Zero mapping
+#define PRA32_U2_ST7789_PIN_RST                    (12)  // Waveshare RP2350 Zero mapping
 
 #define PRA32_U2_DISABLE_USB_MIDI_TRANSMITTION
 
