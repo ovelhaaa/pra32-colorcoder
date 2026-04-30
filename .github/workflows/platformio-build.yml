@@ -45,3 +45,14 @@ jobs:
 
       - name: Compile ${{ matrix.env }}
         run: platformio run -e ${{ matrix.env }}
+
+      - name: Upload i2s_default binaries
+        if: matrix.env == 'i2s_default'
+        uses: actions/upload-artifact@v4
+        with:
+          name: i2s_default-binaries
+          path: |
+            .pio/build/i2s_default/*.uf2
+            .pio/build/i2s_default/*.bin
+            .pio/build/i2s_default/*.elf
+          if-no-files-found: error
