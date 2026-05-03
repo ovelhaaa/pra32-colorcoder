@@ -36,9 +36,9 @@ Parâmetros gráficos ativos:
 
 | Sinal Encoder | Macro no firmware | GPIO RP2350 Zero |
 |---|---|---|
-| Canal A (CLK) | `PRA32_U2_ENCODER_PIN_A` | **GP18** |
-| Canal B (DT) | `PRA32_U2_ENCODER_PIN_B` | **GP19** |
-| Botão (SW) | `PRA32_U2_ENCODER_SWITCH_PIN` | **GP20** |
+| Canal A (CLK) | `PRA32_U2_ENCODER_PIN_A` | **GP14** |
+| Canal B (DT) | `PRA32_U2_ENCODER_PIN_B` | **GP15** |
+| Botão (SW) | `PRA32_U2_ENCODER_SWITCH_PIN` | **GP21** |
 | Comum | — | GND |
 
 Configuração lógica no firmware:
@@ -94,9 +94,9 @@ Parâmetros de áudio I2S ativos:
 ## 2.3 Montagem do encoder
 
 1. Conecte pino comum do encoder (C/GND) ao GND.
-2. Conecte Canal A ao GP18.
-3. Conecte Canal B ao GP19.
-4. Conecte SW (push) ao GP20.
+2. Conecte Canal A ao GP14.
+3. Conecte Canal B ao GP15.
+4. Conecte SW (push) ao GP21.
 5. Como o firmware usa `INPUT_PULLUP`, **não** é necessário pull-up externo na maioria dos módulos.
 6. Se houver ruído mecânico excessivo, melhore cabeamento/aterramento antes de alterar debounce no software.
 
