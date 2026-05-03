@@ -10,6 +10,7 @@
 ## ST7789 + Encoder UI (migrated panel path)
 
 - For the finalized migration architecture, interaction model, pin configuration points, and safety confirmation behavior, see [`docs/st7789-encoder-ui.md`](./docs/st7789-encoder-ui.md).
+- Guia detalhado de pinout e montagem para **Waveshare RP2350 Zero + ST7789 + Encoder + PCM5102**: [`docs/waveshare-rp2350-zero-st7789-encoder-pcm5102.md`](./docs/waveshare-rp2350-zero-st7789-encoder-pcm5102.md).
 
 ![PRA32-U2/P (Grove System)](./pra32-u2-with-panel-grove-system.jpg)
 
