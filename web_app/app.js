@@ -1,6 +1,7 @@
 let audioContext;
 let synthNode;
 let isAudioInitialized = false;
+const defaultInputGain = 0.35;
 
 const startBtn = document.getElementById('start-btn');
 const statusDiv = document.getElementById('status');
@@ -251,6 +252,47 @@ function setupControls() {
         group.appendChild(input);
         controlsDiv.appendChild(group);
     });
+
+    // Input trim control (pre-DSP gain in the worklet output path)
+    const inputGainGroup = document.createElement('div');
+    inputGainGroup.className = 'control-group';
+
+    const inputGainLabel = document.createElement('label');
+    inputGainLabel.htmlFor = 'inputGain';
+    const inputGainValueLabel = document.createElement('span');
+    inputGainValueLabel.style.fontWeight = 'normal';
+    inputGainValueLabel.style.marginLeft = '8px';
+    inputGainLabel.textContent = 'Input Gain';
+    inputGainLabel.appendChild(inputGainValueLabel);
+
+    const inputGainControl = document.createElement('input');
+    inputGainControl.type = 'range';
+    inputGainControl.id = 'inputGain';
+    inputGainControl.min = 0.1;
+    inputGainControl.max = 1.0;
+    inputGainControl.step = 0.01;
+    inputGainControl.value = defaultInputGain;
+
+    const inputGainParam = synthNode.parameters.get('inputGain');
+    const formatInputGainLabel = (gainValue) => {
+        const gain = Math.max(0.0001, gainValue);
+        const percent = Math.round(gain * 100);
+        const db = 20 * Math.log10(gain);
+        inputGainValueLabel.textContent = `(${percent}% | ${db.toFixed(1)} dB)`;
+    };
+
+    inputGainParam.value = defaultInputGain;
+    formatInputGainLabel(defaultInputGain);
+
+    inputGainControl.addEventListener('input', (e) => {
+        const gainValue = parseFloat(e.target.value);
+        inputGainParam.value = gainValue;
+        formatInputGainLabel(gainValue);
+    });
+
+    inputGainGroup.appendChild(inputGainLabel);
+    inputGainGroup.appendChild(inputGainControl);
+    controlsDiv.appendChild(inputGainGroup);
 
     // Keyboard
     const baseNote = 60; // C4
