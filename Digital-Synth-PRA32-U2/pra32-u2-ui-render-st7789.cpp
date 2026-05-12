@@ -237,7 +237,8 @@ void PRA32_U2_UI_RenderST7789_draw(const PRA32_U2_UI_RenderFrame& frame) {
   if (!g_prev_frame_valid ||
       (g_prev_frame.state != frame.state) ||
       (g_prev_frame.confirm_selected != frame.confirm_selected) ||
-      (status_fits_header(g_prev_frame) != status_fits_header(frame))) {
+      (status_fits_header(g_prev_frame) != status_fits_header(frame)) ||
+      (!status_fits_header(frame) && std::strncmp(g_prev_frame.status_text, frame.status_text, sizeof(frame.status_text)) != 0)) {
     dirty |= PRA32_U2_UI_RenderDirty_Footer;
   }
   if (!g_prev_frame_valid ||
