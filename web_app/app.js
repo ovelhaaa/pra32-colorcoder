@@ -485,7 +485,7 @@ function setupControls(presetsLoaded) {
         const WHITE_NOTES = [0,2,4,5,7,9,11];
         const BLACK_OFFSETS = { 1: 0.6, 3: 1.6, 6: 3.6, 8: 4.6, 10: 5.6 };
 
-        const isMobile = window.innerWidth <= 900;
+        const isMobile = isMobileLayout;
         const OCTAVES = isMobile ? 2 : 4;
 
         const keyW = isMobile ? 32 : 40;
