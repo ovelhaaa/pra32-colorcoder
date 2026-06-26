@@ -315,7 +315,7 @@ function setupControls(presetsLoaded) {
             }
 
             synthParameters.forEach(param => {
-                const paramKeyName = param.label.replace(/ /g, '_');
+                const paramKeyName = idToPresetKey[param.id] || param.label.replace(/ /g, '_');
                 const presetData = factoryPresets[paramKeyName];
                 if (presetData && presetData.presets[presetIndex] !== undefined) {
                     const newValue = presetData.presets[presetIndex];
