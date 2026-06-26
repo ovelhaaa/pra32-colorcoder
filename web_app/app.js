@@ -284,7 +284,7 @@ function setupControls(presetsLoaded) {
     // Preset selection
     const presetSelect = document.getElementById('presetSelect');
     if (presetSelect && presetsLoaded && factoryPresets) {
-        // Find how many presets exist by checking an arbitrary preset array
+        presetSelect.innerHTML = '<option value="-1">-- Custom --</option>';
         const sampleParamData = Object.values(factoryPresets)[0];
         if (sampleParamData && sampleParamData.presets) {
             const numPresets = sampleParamData.presets.length;
