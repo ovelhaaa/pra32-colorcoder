@@ -621,7 +621,7 @@ function setupControls(presetsLoaded) {
         keyMap[key] = index;
     });
 
-    const activeNotes = {};
+    // activeNotes is declared above
     mobileMediaQuery.addEventListener('change', (e) => {
         isMobileLayout = e.matches;
 
