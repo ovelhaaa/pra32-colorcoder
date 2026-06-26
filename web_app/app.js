@@ -293,7 +293,7 @@ function setupControls(presetsLoaded) {
                 g.dataset.id = param.id;
                 const size = 52;
 
-                const fmtLabel = param.label.replace(/\s([^\s]+)$/, '\n$1');
+                const fmtLabel = param.label.replace(' ', '\n');
 
                 g.innerHTML = `<div class="knob-svg-wrap">${buildKnobSVG(param.val, param.min, param.max, size)}</div>
                   <div class="pra-knob-label">${fmtLabel}</div>
@@ -317,15 +317,33 @@ function setupControls(presetsLoaded) {
                   updateKnobVisuals(newVal);
                 };
 
-                const onEnd = () => { dragging = false; g.classList.remove('active'); };
+                const onEnd = () => {
+                    dragging = false;
+                    g.classList.remove('active');
+                    window.removeEventListener('mousemove', onMove);
+                    window.removeEventListener('touchmove', onMove);
+                    window.removeEventListener('mouseup', onEnd);
+                    window.removeEventListener('touchmove', onMove, { passive: false });
+                    window.removeEventListener('touchend', onEnd);
+                };
 
-                g.addEventListener('mousedown', e => { dragging = true; startY = e.clientY; startVal = param.val; g.classList.add('active'); });
-                g.addEventListener('touchstart', e => { dragging = true; startY = e.touches[0].clientY; startVal = param.val; g.classList.add('active'); e.preventDefault(); }, { passive: false });
-
-                window.addEventListener('mousemove', onMove);
-                window.addEventListener('touchmove', onMove, { passive: false });
-                window.addEventListener('mouseup', onEnd);
-                window.addEventListener('touchend', onEnd);
+                g.addEventListener('mousedown', e => {
+                    dragging = true;
+                    startY = e.clientY;
+                    startVal = param.val;
+                    g.classList.add('active');
+                    window.addEventListener('mousemove', onMove);
+                    window.addEventListener('mouseup', onEnd);
+                });
+                g.addEventListener('touchstart', e => {
+                    dragging = true;
+                    startY = e.touches[0].clientY;
+                    startVal = param.val;
+                    g.classList.add('active');
+                    e.preventDefault();
+                    window.addEventListener('touchmove', onMove, { passive: false });
+                    window.addEventListener('touchend', onEnd);
+                }, { passive: false });
 
                 panelControls.appendChild(g);
                 sendCC(param.cc, param.val);
@@ -429,7 +447,6 @@ function setupControls(presetsLoaded) {
     // Keyboard
     let isMobileLayout = mobileMediaQuery.matches;
     let octaveOffset = 0;
-    const activeNotes = {};
     const octaveMin = -2;
     const octaveMax = 3;
     const baseNote = 60; // C4
@@ -481,23 +498,11 @@ function setupControls(presetsLoaded) {
     const buildKeyboard = () => {
         keyboardDiv.innerHTML = '';
         keyboardDiv.style.position = 'relative';
-        const handleRelease = (e) => {
-            e.preventDefault();
-            const keyEl = e.currentTarget;
-            const activeNote = parseInt(keyEl.dataset.activeNote, 10);
-            if (!Number.isNaN(activeNote)) {
-                sendNoteOff(activeNote);
-                activePointerNotes.delete(keyEl);
-                keyEl.dataset.activeNote = '';
-                keyEl.classList.remove('pressed');
-                keyEl.classList.remove('active');
-            }
-        };
 
         const WHITE_NOTES = [0,2,4,5,7,9,11];
         const BLACK_OFFSETS = { 1: 0.6, 3: 1.6, 6: 3.6, 8: 4.6, 10: 5.6 };
 
-        const isMobile = isMobileLayout;
+        const isMobile = window.innerWidth <= 900;
         const OCTAVES = isMobile ? 2 : 4;
 
         const keyW = isMobile ? 32 : 40;
@@ -621,7 +626,7 @@ function setupControls(presetsLoaded) {
         keyMap[key] = index;
     });
 
-    // activeNotes is declared above
+    const activeNotes = {};
     mobileMediaQuery.addEventListener('change', (e) => {
         isMobileLayout = e.matches;
 
