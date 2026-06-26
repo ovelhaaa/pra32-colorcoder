@@ -4,7 +4,7 @@ let isAudioInitialized = false;
 
 const startBtn = document.getElementById('start-btn');
 const startOverlay = document.getElementById('start-overlay');
-const statusDiv = document.getElementById('statusDisplay');
+const statusDiv = document.getElementById('status-text');
 
 // Helper to fetch the wasm binary
 async function loadWasm() {
@@ -18,6 +18,9 @@ startBtn.addEventListener('click', async () => {
 
     try {
         startBtn.textContent = 'INITIALIZING...';
+        startBtn.style.borderColor = '#555';
+        startBtn.style.color = '#555';
+        startBtn.style.cursor = 'default';
 
         audioContext = new (window.AudioContext || window.webkitAudioContext)({
             sampleRate: 48000
@@ -37,7 +40,14 @@ startBtn.addEventListener('click', async () => {
         synthNode.port.onmessage = async (e) => {
             if (e.data.type === 'wasmLoaded') {
                 isAudioInitialized = true;
-                statusDiv.textContent = 'Status: ENGINE RUNNING | MIDI READY';
+                statusDiv.textContent = 'ONLINE';
+                statusDiv.classList.add('active');
+                const dot = document.getElementById('status-dot');
+                if (dot) dot.classList.add('active');
+
+                startBtn.textContent = '◼ AUDIO ENGINE ACTIVE';
+                startBtn.disabled = true;
+
                 startOverlay.style.display = 'none';
 
                 setupMidi();
@@ -238,72 +248,126 @@ function setupControls(presetsLoaded) {
 
     let firstTab = true;
 
+    const mobileMediaQuery = window.matchMedia('(max-width: 900px)');
+
     tabsMap.forEach((params, tabName) => {
         // Create Tab Button
-        const tabBtn = document.createElement('button');
-        tabBtn.className = `tab-btn ${firstTab ? 'active' : ''}`;
+        const tabBtn = document.createElement('div');
+        tabBtn.className = `pra-tab-btn ${firstTab ? 'active' : ''}`;
         tabBtn.textContent = tabName;
         tabBtn.dataset.tabTarget = tabName;
 
-        // Create Tab Content Box
+        // Create Panel
         const tabContent = document.createElement('div');
-        tabContent.className = `tab-content ${firstTab ? 'active' : ''}`;
+        // If not mobile, all panels should be active/visible initially
+        const isPanelActive = !mobileMediaQuery.matches || firstTab;
+        tabContent.className = `pra-panel ${isPanelActive ? 'active' : ''}`;
         tabContent.id = `tab-${tabName}`;
 
+        const panelHeader = document.createElement('div');
+        panelHeader.className = 'pra-panel-header';
+        panelHeader.textContent = tabName;
+        tabContent.appendChild(panelHeader);
+
+        const panelControls = document.createElement('div');
+        panelControls.className = 'pra-panel-controls';
+        tabContent.appendChild(panelControls);
+
         tabBtn.addEventListener('click', () => {
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            tabBtn.classList.add('active');
-            tabContent.classList.add('active');
+            if (mobileMediaQuery.matches) {
+                document.querySelectorAll('.pra-tab-btn').forEach(btn => btn.classList.remove('active'));
+                document.querySelectorAll('.pra-panel').forEach(content => content.classList.remove('active'));
+                tabBtn.classList.add('active');
+                tabContent.classList.add('active');
+            }
         });
 
         tabsContainer.appendChild(tabBtn);
 
         // Populate Tab Content
         params.forEach(param => {
-            const group = document.createElement('div');
-            group.className = 'control-group';
+            if (param.type === 'h') {
+                // Render as knob
+                const g = document.createElement('div');
+                g.className = 'pra-knob-group';
+                g.dataset.id = param.id;
+                const size = 52;
 
-            const label = document.createElement('div');
-            label.className = 'control-label';
-            label.textContent = param.label;
+                const fmtLabel = param.label.replace(' ', '\n');
 
-            const faderContainer = document.createElement('div');
+                g.innerHTML = `<div class="knob-svg-wrap">${buildKnobSVG(param.val, param.min, param.max, size)}</div>
+                  <div class="pra-knob-label">${fmtLabel}</div>
+                  <div class="pra-knob-value" id="kv-${param.id}">${param.val}</div>`;
 
-            const input = document.createElement('input');
-            input.type = 'range';
-            input.id = param.id;
-            input.min = param.min;
-            input.max = param.max;
-            input.value = param.val;
+                let dragging = false, startY = 0, startVal = 0;
 
-            if (param.type === 'v') {
-                faderContainer.className = 'fader-vertical-container';
-                input.className = 'fader-vertical';
+                const updateKnobVisuals = (newVal) => {
+                    param.val = newVal;
+                    g.querySelector('.knob-svg-wrap').innerHTML = buildKnobSVG(newVal, param.min, param.max, size);
+                    document.getElementById('kv-' + param.id).textContent = newVal;
+                    sendCC(param.cc, newVal);
+                };
+
+                const onMove = e => {
+                  if (!dragging) return;
+                  const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                  const dy = startY - clientY;
+                  const range = param.max - param.min;
+                  const newVal = Math.min(param.max, Math.max(param.min, Math.round(startVal + dy * range / 100)));
+                  updateKnobVisuals(newVal);
+                };
+
+                const onEnd = () => {
+                    dragging = false;
+                    g.classList.remove('active');
+                    window.removeEventListener('mousemove', onMove);
+                    window.removeEventListener('touchmove', onMove);
+                    window.removeEventListener('mouseup', onEnd);
+                    window.removeEventListener('touchmove', onMove, { passive: false });
+                    window.removeEventListener('touchend', onEnd);
+                };
+
+                g.addEventListener('mousedown', e => {
+                    dragging = true;
+                    startY = e.clientY;
+                    startVal = param.val;
+                    g.classList.add('active');
+                    window.addEventListener('mousemove', onMove);
+                    window.addEventListener('mouseup', onEnd);
+                });
+                g.addEventListener('touchstart', e => {
+                    dragging = true;
+                    startY = e.touches[0].clientY;
+                    startVal = param.val;
+                    g.classList.add('active');
+                    e.preventDefault();
+                    window.addEventListener('touchmove', onMove, { passive: false });
+                    window.addEventListener('touchend', onEnd);
+                }, { passive: false });
+
+                panelControls.appendChild(g);
+                sendCC(param.cc, param.val);
             } else {
-                input.className = 'fader-horizontal';
+                // Render as slider
+                const row = document.createElement('div');
+                row.className = 'pra-slider-row';
+                row.innerHTML = `<span class="pra-slider-name">${param.label}</span>
+                  <input type="range" class="pra-slider" min="${param.min}" max="${param.max}" value="${param.val}" step="1" id="sl-${param.id}">
+                  <span class="pra-slider-val" id="slv-${param.id}">${param.val}</span>`;
+
+                const inp = row.querySelector('input');
+                const valDisp = row.querySelector(`#slv-${param.id}`);
+
+                inp.addEventListener('input', () => {
+                    const newVal = parseInt(inp.value);
+                    valDisp.textContent = newVal;
+                    param.val = newVal;
+                    sendCC(param.cc, newVal);
+                });
+
+                panelControls.appendChild(row);
+                sendCC(param.cc, param.val);
             }
-
-            faderContainer.appendChild(input);
-
-            const valueDisplay = document.createElement('div');
-            valueDisplay.className = 'control-value';
-            valueDisplay.id = `${param.id}-val`;
-            valueDisplay.textContent = param.val;
-
-            input.addEventListener('input', (e) => {
-                const newVal = parseInt(e.target.value);
-                valueDisplay.textContent = newVal;
-                sendCC(param.cc, newVal);
-            });
-
-            // Sync initial value immediately
-            sendCC(param.cc, param.val);
-
-            group.appendChild(label);
-            group.appendChild(faderContainer);
-            group.appendChild(valueDisplay);
-            tabContent.appendChild(group);
         });
 
         tabContentsContainer.appendChild(tabContent);
@@ -320,6 +384,9 @@ function setupControls(presetsLoaded) {
                 updateSlider(param.id, randomVal);
                 sendCC(param.cc, randomVal);
             });
+            // Update preset select to custom
+            const presetSelect = document.getElementById('presetSelect');
+            if (presetSelect) presetSelect.value = "-1";
         });
     }
 
@@ -330,10 +397,18 @@ function setupControls(presetsLoaded) {
         const sampleParamData = Object.values(factoryPresets)[0];
         if (sampleParamData && sampleParamData.presets) {
             const numPresets = sampleParamData.presets.length;
+
+            const presetNames = [
+                "00 · Initialization", "01 · Sync Lead", "02 · Synth Brass", "03 · Pluck Synth",
+                "04 · Mono Synth", "05 · Synth Bass 1", "06 · Synth Bass 2", "07 · Synth Bass 3",
+                "08 · Ethereal Pad", "09 · Gritty Bass", "10 · Chiptune Lead", "11 · Percussive Pluck",
+                "12 · Classic Sweep", "13 · Dark Drone", "14 · Noise Percussion", "15 · Bell Lead"
+            ];
+
             for (let i = 0; i < numPresets; i++) {
                 const option = document.createElement('option');
                 option.value = i;
-                option.textContent = `Preset ${i + 1}`;
+                option.textContent = presetNames[i] || `Preset ${i + 1}`;
                 presetSelect.appendChild(option);
             }
         }
@@ -370,7 +445,6 @@ function setupControls(presetsLoaded) {
     }
 
     // Keyboard
-    const mobileMediaQuery = window.matchMedia('(max-width: 900px)');
     let isMobileLayout = mobileMediaQuery.matches;
     let octaveOffset = 0;
     const octaveMin = -2;
@@ -398,8 +472,9 @@ function setupControls(presetsLoaded) {
     };
 
     const refreshKeyNotes = () => {
-            document.querySelectorAll('.key').forEach((el) => {
+            document.querySelectorAll('.pra-key').forEach((el) => {
                 el.classList.remove('active');
+                el.classList.remove('pressed');
                 if (el.dataset.noteOffset) {
                     const noteOffset = parseInt(el.dataset.noteOffset, 10);
                     if (activePointerNotes.has(el)) {
@@ -411,69 +486,126 @@ function setupControls(presetsLoaded) {
                     el.dataset.note = getNoteValue(noteOffset);
                 }
             });
-            if (isMobileLayout) {
-                updateOctaveDisplay();
-            }
+            updateOctaveDisplay();
     };
 
     const updateOctaveControlsVisibility = () => {
         if (!octaveControls) return;
-        octaveControls.style.display = isMobileLayout ? 'flex' : 'none';
+        // octave controls can always be visible in new design
+        octaveControls.style.display = 'flex';
     };
 
     const buildKeyboard = () => {
         keyboardDiv.innerHTML = '';
-        keyboardDiv.classList.toggle('mobile', isMobileLayout);
-        keys = [];
-        const keyboardKeyCount = isMobileLayout ? 25 : 13;
-        for (let i = 0; i < keyboardKeyCount; i += 1) {
-            keys.push({
-                type: keyPattern[i % 12],
-                note: i,
-                key: desktopKeys[i]
+        keyboardDiv.style.position = 'relative';
+
+        const WHITE_NOTES = [0,2,4,5,7,9,11];
+        const BLACK_OFFSETS = { 1: 0.6, 3: 1.6, 6: 3.6, 8: 4.6, 10: 5.6 };
+
+        const isMobile = window.innerWidth <= 900;
+        const OCTAVES = isMobile ? 2 : 4;
+
+        const keyW = isMobile ? 32 : 40;
+        const blackW = isMobile ? 20 : 24;
+        const whiteH = 80;
+        const blackH = 50;
+
+        const totalWhites = WHITE_NOTES.length * OCTAVES;
+        keyboardDiv.style.width = (totalWhites * keyW) + 'px';
+        keyboardDiv.style.height = whiteH + 'px';
+        keyboardDiv.style.margin = '0 auto';
+
+        for (let oct = 0; oct < OCTAVES; oct++) {
+            // White keys
+            WHITE_NOTES.forEach((noteInOct, wi) => {
+                const noteOffset = oct * 12 + noteInOct;
+                const k = document.createElement('div');
+                k.className = 'pra-key white';
+                k.style.cssText = `position:absolute;left:${(oct*7+wi)*keyW}px;top:0;width:${keyW-1}px;height:${whiteH}px;`;
+
+                k.dataset.noteOffset = noteOffset;
+                k.dataset.note = getNoteValue(noteOffset);
+                k.dataset.activeNote = '';
+
+                const handleRelease = (e) => {
+                    e.preventDefault();
+                    const activeNote = parseInt(k.dataset.activeNote, 10);
+                    if (!Number.isNaN(activeNote)) {
+                        sendNoteOff(activeNote);
+                        activePointerNotes.delete(k);
+                        k.dataset.activeNote = '';
+                        k.classList.remove('pressed');
+                        k.classList.remove('active');
+                    }
+                };
+
+                k.addEventListener('pointerdown', (e) => {
+                    e.preventDefault();
+                    const activeNote = getNoteValue(noteOffset);
+                    k.dataset.activeNote = `${activeNote}`;
+                    activePointerNotes.set(k, activeNote);
+                    sendNoteOn(activeNote);
+                    k.classList.add('pressed');
+                    k.classList.add('active');
+                });
+                k.addEventListener('pointerup', handleRelease);
+                k.addEventListener('pointercancel', handleRelease);
+                k.addEventListener('pointerleave', handleRelease);
+
+                keyboardDiv.appendChild(k);
+            });
+
+            // Black keys
+            Object.entries(BLACK_OFFSETS).forEach(([noteInOctStr, offset]) => {
+                const noteInOct = parseInt(noteInOctStr);
+                const noteOffset = oct * 12 + noteInOct;
+                const k = document.createElement('div');
+                k.className = 'pra-key black';
+                const leftPx = (oct * 7 + offset) * keyW + keyW/2 - blackW/2;
+                k.style.cssText = `position:absolute;left:${leftPx}px;top:0;width:${blackW}px;height:${blackH}px;`;
+
+                k.dataset.noteOffset = noteOffset;
+                k.dataset.note = getNoteValue(noteOffset);
+                k.dataset.activeNote = '';
+
+                const handleRelease = (e) => {
+                    e.preventDefault();
+                    const activeNote = parseInt(k.dataset.activeNote, 10);
+                    if (!Number.isNaN(activeNote)) {
+                        sendNoteOff(activeNote);
+                        activePointerNotes.delete(k);
+                        k.dataset.activeNote = '';
+                        k.classList.remove('pressed');
+                        k.classList.remove('active');
+                    }
+                };
+
+                k.addEventListener('pointerdown', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const activeNote = getNoteValue(noteOffset);
+                    k.dataset.activeNote = `${activeNote}`;
+                    activePointerNotes.set(k, activeNote);
+                    sendNoteOn(activeNote);
+                    k.classList.add('pressed');
+                    k.classList.add('active');
+                });
+                k.addEventListener('pointerup', handleRelease);
+                k.addEventListener('pointercancel', handleRelease);
+                k.addEventListener('pointerleave', handleRelease);
+
+                keyboardDiv.appendChild(k);
             });
         }
-        keys.forEach(k => {
-            const el = document.createElement('div');
-            el.className = `key ${k.type}`;
-            el.dataset.noteOffset = k.note;
-            el.dataset.note = getNoteValue(k.note);
-            el.dataset.activeNote = '';
-
-            const handleRelease = (e) => {
-                e.preventDefault();
-                const activeNote = parseInt(el.dataset.activeNote, 10);
-                if (!Number.isNaN(activeNote)) {
-                    sendNoteOff(activeNote);
-                    activePointerNotes.delete(el);
-                    el.dataset.activeNote = '';
-                    el.classList.remove('active');
-                }
-            };
-
-            el.addEventListener('pointerdown', (e) => {
-                e.preventDefault();
-                const activeNote = getNoteValue(k.note);
-                el.dataset.activeNote = `${activeNote}`;
-                activePointerNotes.set(el, activeNote);
-                sendNoteOn(activeNote);
-                el.classList.add('active');
-            });
-            el.addEventListener('pointerup', handleRelease);
-            el.addEventListener('pointercancel', handleRelease);
-            el.addEventListener('pointerleave', handleRelease);
-            keyboardDiv.appendChild(el);
-        });
     };
 
     buildKeyboard();
     updateOctaveControlsVisibility();
 
     if (octaveControls && octaveDisplay && octaveDownBtn && octaveUpBtn) {
-        if (isMobileLayout) updateOctaveDisplay();
+        updateOctaveDisplay();
 
         octaveDownBtn.addEventListener('click', () => {
-            if (!isMobileLayout) return;
             if (octaveOffset > octaveMin) {
                 octaveOffset -= 1;
                 refreshKeyNotes();
@@ -481,7 +613,6 @@ function setupControls(presetsLoaded) {
         });
 
         octaveUpBtn.addEventListener('click', () => {
-            if (!isMobileLayout) return;
             if (octaveOffset < octaveMax) {
                 octaveOffset += 1;
                 refreshKeyNotes();
@@ -498,10 +629,24 @@ function setupControls(presetsLoaded) {
     const activeNotes = {};
     mobileMediaQuery.addEventListener('change', (e) => {
         isMobileLayout = e.matches;
+
+        // Reset panels to default desktop state if switching to desktop
+        if (!isMobileLayout) {
+            document.querySelectorAll('.pra-panel').forEach(content => content.classList.add('active'));
+        } else {
+            // Restore tab selection for mobile
+            const activeTab = document.querySelector('.pra-tab-btn.active');
+            if (activeTab) {
+                document.querySelectorAll('.pra-panel').forEach(content => content.classList.remove('active'));
+                const targetPanel = document.getElementById(`tab-${activeTab.dataset.tabTarget}`);
+                if (targetPanel) targetPanel.classList.add('active');
+            }
+        }
+
         refreshKeyNotes();
         buildKeyboard();
         updateOctaveControlsVisibility();
-        if (isMobileLayout) updateOctaveDisplay();
+        updateOctaveDisplay();
     });
 
     window.addEventListener('keydown', (e) => {
@@ -511,8 +656,11 @@ function setupControls(presetsLoaded) {
             const note = getNoteValue(noteOffset);
             sendNoteOn(note);
             activeNotes[noteOffset] = note;
-            const el = document.querySelector(`.key[data-note-offset="${noteOffset}"]`);
-            if (el) el.classList.add('active');
+            const el = document.querySelector(`.pra-key[data-note-offset="${noteOffset}"]`);
+            if (el) {
+                el.classList.add('active');
+                el.classList.add('pressed');
+            }
         }
     });
 
@@ -522,8 +670,11 @@ function setupControls(presetsLoaded) {
         if (noteOffset !== undefined && activeNote !== undefined) {
             sendNoteOff(activeNote);
             delete activeNotes[noteOffset];
-            const el = document.querySelector(`.key[data-note-offset="${noteOffset}"]`);
-            if (el) el.classList.remove('active');
+            const el = document.querySelector(`.pra-key[data-note-offset="${noteOffset}"]`);
+            if (el) {
+                el.classList.remove('active');
+                el.classList.remove('pressed');
+            }
         }
     });
 }
@@ -583,18 +734,67 @@ function onMIDIMessage(message) {
 }
 
 function updateSlider(id, value) {
-    const slider = document.getElementById(id);
+    // If it's a DOM event we already updated the visual state,
+    // but this function handles external MIDI or CHAOS/preset changes
+    const slider = document.getElementById(`sl-${id}`);
     if (slider) {
         slider.value = value;
-        const valDisplay = document.getElementById(`${id}-val`);
+        const valDisplay = document.getElementById(`slv-${id}`);
         if (valDisplay) valDisplay.textContent = value;
+        return;
+    }
+
+    // Check if it's a knob
+    const kv = document.getElementById(`kv-${id}`);
+    if (kv) {
+        kv.textContent = value;
+        const g = kv.closest('.pra-knob-group');
+        if (g) {
+            const def = synthParameters.find(p => p.id === id);
+            if (def) {
+                def.val = value;
+                const wrap = g.querySelector('.knob-svg-wrap');
+                if (wrap) {
+                    wrap.innerHTML = buildKnobSVG(value, def.min, def.max, 52);
+                }
+            }
+        }
     }
 }
 
+function buildKnobSVG(val, min, max, size) {
+  const norm = (val - min) / (max - min);
+  const startAngle = -220 * Math.PI / 180;
+  const endAngle = 40 * Math.PI / 180;
+  const angle = startAngle + norm * (endAngle - startAngle);
+  const cx = size / 2, cy = size / 2, r = size / 2 - 5;
+  const trackA1x = cx + r * Math.cos(startAngle);
+  const trackA1y = cy + r * Math.sin(startAngle);
+  const trackA2x = cx + r * Math.cos(endAngle);
+  const trackA2y = cy + r * Math.sin(endAngle);
+  const px = cx + r * Math.cos(angle);
+  const py = cy + r * Math.sin(angle);
+  const arcStartX = cx + r * Math.cos(startAngle);
+  const arcStartY = cy + r * Math.sin(startAngle);
+  const largeArc = norm > 0.72 ? 1 : 0;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="pra-knob-svg">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="#1A1A1A" stroke="#222" stroke-width="1"/>
+    <path d="M ${trackA1x} ${trackA1y} A ${r} ${r} 0 1 1 ${trackA2x} ${trackA2y}" fill="none" stroke="#252525" stroke-width="3" stroke-linecap="round"/>
+    <path d="M ${arcStartX} ${arcStartY} A ${r} ${r} 0 ${largeArc} 1 ${px} ${py}" fill="none" stroke="#E8A020" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="${px}" cy="${py}" r="2.5" fill="#E8A020"/>
+    <circle cx="${cx}" cy="${cy}" r="${r * 0.35}" fill="#222"/>
+  </svg>`;
+}
+
 function highlightKey(note, active) {
-    const el = document.querySelector(`.key[data-note="${note}"]`);
+    const el = document.querySelector(`.pra-key[data-note="${note}"]`);
     if (el) {
-        if (active) el.classList.add('active');
-        else el.classList.remove('active');
+        if (active) {
+            el.classList.add('active');
+            el.classList.add('pressed');
+        } else {
+            el.classList.remove('active');
+            el.classList.remove('pressed');
+        }
     }
 }

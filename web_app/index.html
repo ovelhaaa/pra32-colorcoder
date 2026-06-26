@@ -4,405 +4,198 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>PRA32-U2 Web Synth</title>
+    <link rel="stylesheet" href="styles.css">
     <style>
-        /* Mobile-First & Hardware Aesthetic */
-        :root {
-            --bg-color: #1a1a1a;
-            --panel-bg: #2a2a2a;
-            --text-color: #e0e0e0;
-            --accent-color: #00ff00; /* Neon green */
-            --accent-dim: #004400;
-            --mutate-color: #ff0055; /* Neon pink for chaos */
-            --border-color: #444;
-            --fader-bg: #111;
-            --fader-thumb: #666;
-        }
+        /* Additional Layout CSS for Desktop / Mobile Panels */
+        * { box-sizing: border-box; touch-action: pan-y; }
+        body, html { margin: 0; padding: 0; height: 100%; background: #0E0E0E; color: #E0E0E0; overflow: hidden; }
 
-        * {
-            box-sizing: border-box;
-            touch-action: pan-y; /* Prevent pinch zoom but allow vertical scroll if needed */
-        }
-
-        body, html {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: 'Courier New', Courier, monospace; /* Monospace for technical feel */
-            overflow: hidden; /* Fixed app layout */
-        }
-
-        .synth-container {
+        .pra-root {
             display: flex;
             flex-direction: column;
             height: 100%;
-            max-width: 800px;
+            max-width: 1200px;
             margin: 0 auto;
-            background-color: var(--panel-bg);
-            border: 2px solid var(--border-color);
-            border-radius: 8px;
-            padding: 10px;
+            border-radius: 0;
+            padding: 0;
         }
 
-        /* Header & Mutate Button */
-        .header {
+        .pra-body {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            padding-bottom: 0;
+        }
+
+        .pra-main-controls {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Mobile Tabs */
+        .pra-tabs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            padding: 10px 24px 0 24px;
+            display: none;
+        }
+
+        .pra-tab-btn {
+            flex: 1;
+            min-width: 60px;
+            background: #141414;
+            color: #555;
+            border: 1px solid #2A2A2A;
+            border-bottom: none;
+            padding: 8px 4px;
+            font-family: 'Space Mono', monospace;
+            font-size: 10px;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 4px 4px 0 0;
+            text-transform: uppercase;
+        }
+
+        .pra-tab-btn.active {
+            background: #1C1C1C;
+            color: #E8A020;
+            border-color: #333;
+        }
+
+        /* Panels Area */
+        .pra-panels-container {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 10px 24px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            align-content: start;
+        }
+
+        .pra-panel {
+            background: #141414;
+            border: 1px solid #2A2A2A;
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .pra-panel-header {
+            font-family: 'Space Mono', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            color: #888;
+            border-bottom: 1px solid #2A2A2A;
+            padding-bottom: 8px;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 10px;
         }
 
-        .header h1 {
-            font-size: 1.2rem;
-            margin: 0;
-            color: var(--accent-color);
-            text-shadow: 0 0 5px var(--accent-dim);
-        }
-
-        .mutate-btn {
-            background-color: var(--mutate-color);
-            color: white;
-            border: none;
-            padding: 10px 15px;
-            font-size: 0.9rem;
-            font-weight: bold;
-            border-radius: 4px;
-            box-shadow: 0 4px 0 #990033;
-            cursor: pointer;
-            text-transform: uppercase;
-        }
-        .mutate-btn:active {
-            box-shadow: 0 0 0 #990033;
-            transform: translateY(4px);
-        }
-
-        /* Preset & Status */
-        .top-controls {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-        .preset-row {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        select#presetSelect {
-            flex-grow: 1;
-            background-color: var(--bg-color);
-            color: var(--accent-color);
-            border: 1px solid var(--accent-color);
-            padding: 8px;
-            font-family: inherit;
-        }
-        .status-bar {
-            text-align: center;
-            font-size: 0.8rem;
-            padding: 5px;
-            border: 1px solid var(--accent-dim);
-            color: var(--accent-color);
-        }
-
-        /* Tabs Navigation */
-        .tabs {
+        .pra-panel-controls {
             display: flex;
             flex-wrap: wrap;
-            gap: 5px;
-            margin-bottom: 10px;
-        }
-        .tab-btn {
-            flex: 1;
-            min-width: 60px;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            border: 1px solid var(--border-color);
-            padding: 10px 5px;
-            cursor: pointer;
-            font-family: inherit;
-            font-weight: bold;
-            text-transform: uppercase;
-            border-radius: 4px 4px 0 0;
-            text-align: center;
-        }
-        .tab-btn.active {
-            background-color: var(--border-color);
-            color: var(--accent-color);
-            border-bottom: 2px solid var(--accent-color);
-        }
-
-        /* Tab Content Area */
-        .tab-content {
-            display: none;
-            flex-grow: 1;
-            overflow-y: auto;
-            border: 1px solid var(--border-color);
-            padding: 10px;
-            border-radius: 0 0 4px 4px;
-            background-color: var(--bg-color);
-            /* Setup for grid layout inside */
-            grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
-            gap: 15px;
-            align-content: start;
-            padding-bottom: 20px;
-        }
-        .tab-content.active {
-            display: grid;
-        }
-
-        /* Faders & Knobs */
-        .control-group {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            background-color: var(--panel-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 4px;
-            padding: 8px 4px;
-        }
-        .control-label {
-            font-size: 0.75rem;
-            margin-bottom: 8px;
-            text-align: center;
-            height: 24px;
-            display: flex;
-            align-items: center;
+            gap: 16px;
             justify-content: center;
-            width: 100%;
-            cursor: default;
-        }
-        .control-value {
-            font-size: 0.7rem;
-            margin-top: 8px;
-            background-color: #000;
-            color: var(--accent-color);
-            padding: 2px 6px;
-            border-radius: 2px;
-            min-width: 30px;
-            text-align: center;
         }
 
-        /* Native Slider Styling to look like Faders */
-        input[type=range] {
-            -webkit-appearance: none;
-            background: transparent;
-        }
-        input[type=range]:focus {
-            outline: none;
-        }
-        /* Thumb */
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            height: 24px;
-            width: 24px;
-            border-radius: 4px;
-            background: var(--fader-thumb);
-            cursor: pointer;
-            margin-top: -10px; /* Centering relative to track */
-            border: 2px solid #888;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-        }
-        /* Track */
-        input[type=range]::-webkit-slider-runnable-track {
-            width: 100%;
-            height: 4px;
-            cursor: pointer;
-            background: var(--fader-bg);
-            border-radius: 2px;
-            border: 1px solid #000;
+        /* Responsive Overrides */
+        @media (max-width: 900px) {
+            .pra-tabs {
+                display: flex;
+            }
+            .pra-panels-container {
+                display: flex;
+                flex-direction: column;
+                padding: 10px;
+                gap: 10px;
+            }
+            .pra-panel {
+                display: none;
+                border-radius: 0 0 8px 8px;
+                border-top: 1px solid #333;
+            }
+            .pra-panel.active {
+                display: flex;
+            }
         }
 
-        /* Fader specific classes */
-        .fader-horizontal {
-            width: 100%;
-            margin: 10px 0;
-        }
-
-        /* Vertical fader trick */
-        .fader-vertical-container {
-            width: 30px;
-            height: 100px; /* Explicit height for layout */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: 5px 0;
-        }
-        .fader-vertical {
-            width: 100px;
-            transform: rotate(-90deg);
-        }
-
-        /* Fixed Keyboard at Bottom */
-        #keyboard {
-            display: flex;
-            height: 80px;
-            width: 100%;
-            background-color: #111;
-            border-top: 2px solid var(--border-color);
-            margin-top: 10px;
-            position: relative;
-            touch-action: none;
-            user-select: none;
-            -webkit-user-select: none;
-        }
-
-        .key {
-            flex: 1;
-            border: 1px solid #000;
-            border-radius: 0 0 4px 4px;
-            box-sizing: border-box;
-            cursor: pointer;
-        }
-
-        .white-key {
-            background-color: #fff;
-            z-index: 1;
-        }
-
-        .white-key.active {
-            background-color: #ccc;
-        }
-
-        .black-key {
-            background-color: #000;
-            width: 6%;
-            height: 60%;
-            position: absolute;
-            z-index: 2;
-            border-radius: 0 0 3px 3px;
-        }
-
-        .black-key.active {
-            background-color: #333;
-        }
-
-        /* Positioning black keys (for 1 octave C-C roughly) */
-        .bk-1 { left: 9.5%; } /* C# */
-        .bk-2 { left: 22%; }  /* D# */
-        .bk-3 { left: 47%; }  /* F# */
-        .bk-4 { left: 59.5%; }/* G# */
-        .bk-5 { left: 72%; }  /* A# */
-
-        /* Start Overlay */
+        /* Full Screen Overlay */
         #start-overlay {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(14, 14, 14, 0.95);
             z-index: 1000;
             display: flex;
             justify-content: center;
             align-items: center;
         }
 
-        #start-btn {
-            background-color: var(--accent-color);
-            color: #000;
-            border: none;
-            padding: 20px 40px;
-            font-size: 1.5rem;
-            font-weight: bold;
-            border-radius: 8px;
-            cursor: pointer;
-            box-shadow: 0 4px 0 var(--accent-dim);
-            text-transform: uppercase;
-        }
-
-        #start-btn:active {
-            box-shadow: 0 0 0 var(--accent-dim);
-            transform: translateY(4px);
-        }
-
-        /* Octave Controls */
-        #octave-controls {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-top: 10px;
-            padding: 0 10px;
-            background-color: var(--bg-color);
-            border: 1px solid var(--border-color);
+        .mutate-btn {
+            background: none;
+            border: 1px solid #E8A020;
+            color: #E8A020;
+            padding: 4px 8px;
+            font-family: 'Space Mono', monospace;
+            font-size: 9px;
             border-radius: 4px;
-        }
-
-        .octave-btn {
-            background-color: var(--panel-bg);
-            color: var(--text-color);
-            border: 1px solid var(--border-color);
-            padding: 5px 15px;
             cursor: pointer;
-            font-weight: bold;
+            transition: all 0.2s;
         }
-
-        .octave-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        #octave-display {
-            font-size: 0.9rem;
-            color: var(--accent-color);
-        }
+        .mutate-btn:hover { background: rgba(232, 160, 32, 0.1); }
+        .mutate-btn:active { background: #E8A020; color: #141414; }
 
     </style>
 </head>
 <body>
 
 <div id="start-overlay">
-    <button id="start-btn">START SYNTH</button>
+    <button class="pra-init-btn" id="start-btn" style="margin: 0; padding: 20px 40px; font-size: 14px;">▶ INIT AUDIO ENGINE</button>
 </div>
 
-<div class="synth-container">
-    <div class="header">
-        <h1>PRA32-U2 WEB SYNTH</h1>
-        <button class="mutate-btn" id="circuitBendBtn">CHAOS</button>
+<div class="pra-root">
+    <div class="pra-header">
+        <div class="pra-logo">PRA32-U2 <span>/ SYNTHESIZER</span></div>
+        <div class="pra-status-bar">
+            <button class="mutate-btn" id="circuitBendBtn">CHAOS</button>
+            <div class="pra-status-dot" id="status-dot"></div>
+            <span class="pra-status-text" id="status-text">OFFLINE</span>
+        </div>
     </div>
 
-    <div class="top-controls">
-        <div class="preset-row">
-            <label style="color: var(--accent-color); font-size: 0.9rem;">PRESET</label>
-            <select id="presetSelect">
-                <option value="-1">-- Custom --</option>
+    <div class="pra-body">
+        <div class="pra-preset-row">
+            <span class="pra-preset-label">PRESET</span>
+            <select class="pra-preset-select" id="presetSelect">
+                <option value="-1">— Custom —</option>
             </select>
         </div>
-        <div class="status-bar" id="statusDisplay">
-            Status: INITIALIZING...
+
+        <div class="pra-main-controls">
+            <div class="pra-tabs" id="tabsContainer"></div>
+            <div class="pra-panels-container" id="tabContentsContainer"></div>
         </div>
-    </div>
 
-    <div class="tabs" id="tabsContainer">
-        <!-- Tabs generated dynamically by JS -->
-    </div>
-
-    <div id="tabContentsContainer" style="flex-grow: 1; display: flex; flex-direction: column; overflow: hidden;">
-        <!-- Tab contents generated dynamically by JS -->
-    </div>
-
-    <!-- Octave Controls -->
-    <div id="octave-controls">
-        <button class="octave-btn" id="octave-down">OCT -</button>
-        <span id="octave-display">C4</span>
-        <button class="octave-btn" id="octave-up">OCT +</button>
-    </div>
-
-    <!-- Fixed Keyboard -->
-    <div id="keyboard">
-        <div class="key white-key" data-note="60"></div>
-        <div class="key black-key bk-1" data-note="61"></div>
-        <div class="key white-key" data-note="62"></div>
-        <div class="key black-key bk-2" data-note="63"></div>
-        <div class="key white-key" data-note="64"></div>
-        <div class="key white-key" data-note="65"></div>
-        <div class="key black-key bk-3" data-note="66"></div>
-        <div class="key white-key" data-note="67"></div>
-        <div class="key black-key bk-4" data-note="68"></div>
-        <div class="key white-key" data-note="69"></div>
-        <div class="key black-key bk-5" data-note="70"></div>
-        <div class="key white-key" data-note="71"></div>
-        <div class="key white-key" data-note="72"></div>
+        <div class="pra-kbd-section" style="margin-top: 0;">
+            <div class="pra-oct-row">
+                <span class="pra-oct-label">KEYBOARD</span>
+                <div class="pra-oct-controls" id="octave-controls">
+                    <button class="pra-oct-btn" id="octave-down">OCT −</button>
+                    <span class="pra-oct-disp" id="octave-display">C4</span>
+                    <button class="pra-oct-btn" id="octave-up">OCT +</button>
+                </div>
+            </div>
+            <div class="pra-keyboard" id="keyboard"></div>
+        </div>
     </div>
 </div>
 

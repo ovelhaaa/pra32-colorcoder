@@ -30,3 +30,4 @@
 # Others
 *.wav
 DigitalSynthVRA8U/build/*
+node_modules/
