@@ -251,6 +251,7 @@ function setupControls(presetsLoaded) {
 
             input.addEventListener('input', (e) => {
                 const newVal = parseInt(e.target.value);
+                param.val = newVal;
                 valueDisplay.textContent = newVal;
                 sendCC(param.cc, newVal);
             });
