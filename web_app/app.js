@@ -302,7 +302,7 @@ function setupControls(presetsLoaded) {
             if (presetIndex < 0) {
                 // Restore to current/init value from presets.json first array.
                 synthParameters.forEach(param => {
-                    const paramKeyName = param.label.replace(/ /g, '_');
+                    const paramKeyName = idToPresetKey[param.id] || param.label.replace(/ /g, '_');
                     const presetData = factoryPresets[paramKeyName];
                     if (presetData && presetData.current[0] !== undefined) {
                         const newValue = presetData.current[0];
