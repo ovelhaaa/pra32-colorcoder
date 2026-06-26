@@ -429,6 +429,7 @@ function setupControls(presetsLoaded) {
     // Keyboard
     let isMobileLayout = mobileMediaQuery.matches;
     let octaveOffset = 0;
+    const activeNotes = {};
     const octaveMin = -2;
     const octaveMax = 3;
     const baseNote = 60; // C4
