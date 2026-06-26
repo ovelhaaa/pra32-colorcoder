@@ -182,6 +182,48 @@ function setupControls(presetsLoaded) {
     const tabsContainer = document.getElementById('tabsContainer');
     const tabContentsContainer = document.getElementById('tabContentsContainer');
 
+    const idToPresetKey = {
+        osc1Wave: 'OSC_1_WAVE',
+        osc1Shape: 'OSC_1_SHAPE',
+        osc1Morph: 'OSC_1_MORPH',
+        osc2Wave: 'OSC_2_WAVE',
+        osc2Coarse: 'OSC_2_COARSE',
+        osc2Pitch: 'OSC_2_PITCH',
+        oscMix: 'MIXER_OSC_MIX',
+        subOsc: 'MIXER_SUB_OSC',
+        oscDrift: 'OSC_DRIFT',
+        sawWMode: 'OSC_SAW_W_MODE',
+        filterCutoff: 'FILTER_CUTOFF',
+        filterReso: 'FILTER_RESO',
+        filterMode: 'FILTER_MODE',
+        egFltAmt: 'FILTER_EG_AMT',
+        filterKeyTrk: 'FILTER_KEY_TRK',
+        bthFltAmt: 'BTH_FILTER_AMT',
+        relEqDcy: 'REL_EQ_DECAY',
+        egOscAmt: 'EG_OSC_AMT',
+        egAttack: 'EG_ATTACK',
+        egDecay: 'EG_DECAY',
+        egSustain: 'EG_SUSTAIN',
+        egRelease: 'EG_RELEASE',
+        ampAttack: 'AMP_ATTACK',
+        ampDecay: 'AMP_DECAY',
+        ampSustain: 'AMP_SUSTAIN',
+        ampRelease: 'AMP_RELEASE',
+        lfoWave: 'LFO_WAVE',
+        lfoRate: 'LFO_RATE',
+        lfoFltAmt: 'LFO_FILTER_AMT',
+        lfoOscAmt: 'LFO_OSC_AMT',
+        lfoFadeTime: 'LFO_FADE_TIME',
+        pbRange: 'P_BEND_RANGE',
+        choRate: 'CHORUS_RATE',
+        choDepth: 'CHORUS_DEPTH',
+        delayTime: 'DELAY_TIME',
+        delayDepth: 'DELAY_LEVEL',
+        pan: 'PAN',
+        ampGain: 'AMP_GAIN',
+        portaTime: 'PORTAMENTO'
+    };
+
     tabsContainer.innerHTML = '';
     tabContentsContainer.innerHTML = '';
 
@@ -251,7 +293,6 @@ function setupControls(presetsLoaded) {
 
             input.addEventListener('input', (e) => {
                 const newVal = parseInt(e.target.value);
-                param.val = newVal;
                 valueDisplay.textContent = newVal;
                 sendCC(param.cc, newVal);
             });
@@ -285,7 +326,7 @@ function setupControls(presetsLoaded) {
     // Preset selection
     const presetSelect = document.getElementById('presetSelect');
     if (presetSelect && presetsLoaded && factoryPresets) {
-        presetSelect.innerHTML = '<option value="-1">-- Custom --</option>';
+        // Find how many presets exist by checking an arbitrary preset array
         const sampleParamData = Object.values(factoryPresets)[0];
         if (sampleParamData && sampleParamData.presets) {
             const numPresets = sampleParamData.presets.length;
