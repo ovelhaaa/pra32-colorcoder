@@ -481,6 +481,18 @@ function setupControls(presetsLoaded) {
     const buildKeyboard = () => {
         keyboardDiv.innerHTML = '';
         keyboardDiv.style.position = 'relative';
+        const handleRelease = (e) => {
+            e.preventDefault();
+            const keyEl = e.currentTarget;
+            const activeNote = parseInt(keyEl.dataset.activeNote, 10);
+            if (!Number.isNaN(activeNote)) {
+                sendNoteOff(activeNote);
+                activePointerNotes.delete(keyEl);
+                keyEl.dataset.activeNote = '';
+                keyEl.classList.remove('pressed');
+                keyEl.classList.remove('active');
+            }
+        };
 
         const WHITE_NOTES = [0,2,4,5,7,9,11];
         const BLACK_OFFSETS = { 1: 0.6, 3: 1.6, 6: 3.6, 8: 4.6, 10: 5.6 };
