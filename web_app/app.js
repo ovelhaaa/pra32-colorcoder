@@ -3,7 +3,8 @@ let synthNode;
 let isAudioInitialized = false;
 
 const startBtn = document.getElementById('start-btn');
-const statusDiv = document.getElementById('status');
+const startOverlay = document.getElementById('start-overlay');
+const statusDiv = document.getElementById('statusDisplay');
 
 // Helper to fetch the wasm binary
 async function loadWasm() {
@@ -37,7 +38,7 @@ startBtn.addEventListener('click', async () => {
             if (e.data.type === 'wasmLoaded') {
                 isAudioInitialized = true;
                 statusDiv.textContent = 'Status: ENGINE RUNNING | MIDI READY';
-                startBtn.style.display = 'none';
+                startOverlay.style.display = 'none';
 
                 setupMidi();
                 const presetsLoaded = await loadPresets();
@@ -178,55 +179,134 @@ const synthParameters = [
 const ccToParam = new Map(synthParameters.map(p => [p.cc, p]));
 
 function setupControls(presetsLoaded) {
-    const controlsDiv = document.getElementById('synth-controls');
-    controlsDiv.innerHTML = ''; // Clear initial layout
+    const tabsContainer = document.getElementById('tabsContainer');
+    const tabContentsContainer = document.getElementById('tabContentsContainer');
 
+    tabsContainer.innerHTML = '';
+    tabContentsContainer.innerHTML = '';
+
+    // Group parameters by tab
+    const tabsMap = new Map();
     synthParameters.forEach(param => {
-        const group = document.createElement('div');
-        group.className = 'control-group';
-
-        const label = document.createElement('label');
-        label.htmlFor = param.id;
-        label.textContent = `${param.name} (CC ${param.cc})`;
-
-        const input = document.createElement('input');
-        input.type = 'range';
-        input.id = param.id;
-        input.min = 0;
-        input.max = 127;
-        input.value = param.value;
-
-        input.addEventListener('input', (e) => {
-            sendCC(param.cc, parseInt(e.target.value));
-        });
-
-        // Sync initial value immediately
-        sendCC(param.cc, param.value);
-
-        group.appendChild(label);
-        group.appendChild(input);
-        controlsDiv.appendChild(group);
+        if (!tabsMap.has(param.tab)) {
+            tabsMap.set(param.tab, []);
+        }
+        tabsMap.get(param.tab).push(param);
     });
 
+    let firstTab = true;
+
+    tabsMap.forEach((params, tabName) => {
+        // Create Tab Button
+        const tabBtn = document.createElement('button');
+        tabBtn.className = `tab-btn ${firstTab ? 'active' : ''}`;
+        tabBtn.textContent = tabName;
+        tabBtn.dataset.tabTarget = tabName;
+
+        // Create Tab Content Box
+        const tabContent = document.createElement('div');
+        tabContent.className = `tab-content ${firstTab ? 'active' : ''}`;
+        tabContent.id = `tab-${tabName}`;
+
+        tabBtn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            tabBtn.classList.add('active');
+            tabContent.classList.add('active');
+        });
+
+        tabsContainer.appendChild(tabBtn);
+
+        // Populate Tab Content
+        params.forEach(param => {
+            const group = document.createElement('div');
+            group.className = 'control-group';
+
+            const label = document.createElement('div');
+            label.className = 'control-label';
+            label.textContent = param.label;
+
+            const faderContainer = document.createElement('div');
+
+            const input = document.createElement('input');
+            input.type = 'range';
+            input.id = param.id;
+            input.min = param.min;
+            input.max = param.max;
+            input.value = param.val;
+
+            if (param.type === 'v') {
+                faderContainer.className = 'fader-vertical-container';
+                input.className = 'fader-vertical';
+            } else {
+                input.className = 'fader-horizontal';
+            }
+
+            faderContainer.appendChild(input);
+
+            const valueDisplay = document.createElement('div');
+            valueDisplay.className = 'control-value';
+            valueDisplay.id = `${param.id}-val`;
+            valueDisplay.textContent = param.val;
+
+            input.addEventListener('input', (e) => {
+                const newVal = parseInt(e.target.value);
+                valueDisplay.textContent = newVal;
+                sendCC(param.cc, newVal);
+            });
+
+            // Sync initial value immediately
+            sendCC(param.cc, param.val);
+
+            group.appendChild(label);
+            group.appendChild(faderContainer);
+            group.appendChild(valueDisplay);
+            tabContent.appendChild(group);
+        });
+
+        tabContentsContainer.appendChild(tabContent);
+        firstTab = false;
+    });
+
+    // CHAOS Button
+    const chaosBtn = document.getElementById('circuitBendBtn');
+    if (chaosBtn) {
+        chaosBtn.addEventListener('click', () => {
+            synthParameters.forEach(param => {
+                const randomVal = Math.floor(Math.random() * (param.max - param.min + 1)) + param.min;
+                param.val = randomVal;
+                updateSlider(param.id, randomVal);
+                sendCC(param.cc, randomVal);
+            });
+        });
+    }
+
     // Preset selection
-    const presetSelect = document.getElementById('preset-select');
-    if (presetSelect) {
+    const presetSelect = document.getElementById('presetSelect');
+    if (presetSelect && presetsLoaded && factoryPresets) {
+        // Find how many presets exist by checking an arbitrary preset array
+        const sampleParamData = Object.values(factoryPresets)[0];
+        if (sampleParamData && sampleParamData.presets) {
+            const numPresets = sampleParamData.presets.length;
+            for (let i = 0; i < numPresets; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `Preset ${i + 1}`;
+                presetSelect.appendChild(option);
+            }
+        }
+
         presetSelect.addEventListener('change', (e) => {
             const presetIndex = parseInt(e.target.value);
-
-            if (!presetsLoaded || !factoryPresets) {
-                console.warn('Preset bank not loaded; preset change ignored.');
-                return;
-            }
 
             if (presetIndex < 0) {
                 // Restore to current/init value from presets.json first array.
                 synthParameters.forEach(param => {
-                    const paramKeyName = param.name.replace(/ /g, '_');
+                    const paramKeyName = param.label.replace(/ /g, '_');
                     const presetData = factoryPresets[paramKeyName];
                     if (presetData && presetData.current[0] !== undefined) {
                         const newValue = presetData.current[0];
-                        param.value = newValue;
+                        param.val = newValue;
                         updateSlider(param.id, newValue);
                         sendCC(param.cc, newValue);
                     }
@@ -235,49 +315,17 @@ function setupControls(presetsLoaded) {
             }
 
             synthParameters.forEach(param => {
-                const paramKeyName = param.name.replace(/ /g, '_');
+                const paramKeyName = param.label.replace(/ /g, '_');
                 const presetData = factoryPresets[paramKeyName];
                 if (presetData && presetData.presets[presetIndex] !== undefined) {
                     const newValue = presetData.presets[presetIndex];
-                    param.value = newValue;
+                    param.val = newValue;
                     updateSlider(param.id, newValue);
                     sendCC(param.cc, newValue);
                 }
             });
         });
     }
-
-    // Hacker Controls
-    const hackerControls = [
-        { id: 'bitCrush', name: 'Hacker: Bitcrush', min: 0, max: 1, step: 0.01, value: 0 },
-        { id: 'pwmSimulate', name: 'Hacker: PWM Noise', min: 0, max: 1, step: 0.01, value: 0 }
-    ];
-
-    hackerControls.forEach(param => {
-        const group = document.createElement('div');
-        group.className = 'control-group';
-
-        const label = document.createElement('label');
-        label.htmlFor = param.id;
-        label.textContent = param.name;
-
-        const input = document.createElement('input');
-        input.type = 'range';
-        input.id = param.id;
-        input.min = param.min;
-        input.max = param.max;
-        input.step = param.step;
-        input.value = param.value;
-
-        const synthParam = synthNode.parameters.get(param.id);
-        input.addEventListener('input', (e) => {
-            synthParam.value = parseFloat(e.target.value);
-        });
-
-        group.appendChild(label);
-        group.appendChild(input);
-        controlsDiv.appendChild(group);
-    });
 
     // Keyboard
     const mobileMediaQuery = window.matchMedia('(max-width: 900px)');
@@ -494,7 +542,11 @@ function onMIDIMessage(message) {
 
 function updateSlider(id, value) {
     const slider = document.getElementById(id);
-    if (slider) slider.value = value;
+    if (slider) {
+        slider.value = value;
+        const valDisplay = document.getElementById(`${id}-val`);
+        if (valDisplay) valDisplay.textContent = value;
+    }
 }
 
 function highlightKey(note, active) {
