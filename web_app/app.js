@@ -293,7 +293,7 @@ function setupControls(presetsLoaded) {
                 g.dataset.id = param.id;
                 const size = 52;
 
-                const fmtLabel = param.label.replace(' ', '\n');
+                const fmtLabel = param.label.replace(/\s([^\s]+)$/, '\n$1');
 
                 g.innerHTML = `<div class="knob-svg-wrap">${buildKnobSVG(param.val, param.min, param.max, size)}</div>
                   <div class="pra-knob-label">${fmtLabel}</div>
