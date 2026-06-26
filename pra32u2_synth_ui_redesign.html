@@ -1,0 +1,543 @@
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap');
+
+  .pra-root {
+    font-family: 'Space Grotesk', sans-serif;
+    background: #0E0E0E;
+    border-radius: 12px;
+    padding: 0 0 24px 0;
+    overflow: hidden;
+    user-select: none;
+  }
+
+  .pra-header {
+    background: #141414;
+    border-bottom: 1px solid #2A2A2A;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .pra-logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: #E8A020;
+    letter-spacing: 3px;
+  }
+
+  .pra-logo span {
+    color: #666;
+    font-weight: 400;
+  }
+
+  .pra-status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: #555;
+  }
+
+  .pra-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #333;
+    transition: background 0.3s;
+  }
+
+  .pra-status-dot.active { background: #E8A020; box-shadow: 0 0 4px #E8A020; }
+
+  .pra-status-text { color: #666; }
+  .pra-status-text.active { color: #E8A020; }
+
+  .pra-body { padding: 20px 24px 0; }
+
+  .pra-init-btn {
+    width: 100%;
+    background: transparent;
+    border: 1px solid #E8A020;
+    color: #E8A020;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    padding: 11px 0;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.15s, color 0.15s;
+  }
+
+  .pra-init-btn:hover { background: #E8A020; color: #000; }
+
+  .pra-preset-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .pra-preset-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: #555;
+    letter-spacing: 1.5px;
+    white-space: nowrap;
+  }
+
+  .pra-preset-select {
+    flex: 1;
+    background: #1A1A1A;
+    border: 1px solid #2A2A2A;
+    color: #C8C8C8;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    padding: 7px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23555'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+  }
+
+  .pra-preset-select:focus { border-color: #E8A020; }
+
+  .pra-section-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: #444;
+    text-transform: uppercase;
+    margin: 20px 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pra-section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #1E1E1E;
+  }
+
+  .pra-controls-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  @media (max-width: 600px) {
+    .pra-controls-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .pra-knob-group {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 8px;
+    background: #141414;
+    border: 1px solid #1E1E1E;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    position: relative;
+  }
+
+  .pra-knob-group:hover { border-color: #333; }
+  .pra-knob-group.active { border-color: #E8A020; }
+
+  .pra-knob-svg { display: block; }
+
+  .pra-knob-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 1.5px;
+    color: #555;
+    text-transform: uppercase;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  .pra-knob-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: #E8A020;
+    font-weight: 700;
+    min-width: 32px;
+    text-align: center;
+  }
+
+  .pra-slider-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 10px 0;
+  }
+
+  .pra-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pra-slider-name {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    color: #555;
+    text-transform: uppercase;
+    min-width: 52px;
+  }
+
+  .pra-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 2px;
+    background: #252525;
+    border-radius: 1px;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .pra-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #E8A020;
+    cursor: pointer;
+    border: none;
+  }
+
+  .pra-slider::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #E8A020;
+    border: none;
+    cursor: pointer;
+  }
+
+  .pra-slider-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    color: #888;
+    min-width: 28px;
+    text-align: right;
+  }
+
+  .pra-kbd-section {
+    margin: 20px 0 0;
+    background: #141414;
+    border: 1px solid #1E1E1E;
+    border-radius: 8px;
+    padding: 16px;
+  }
+
+  .pra-oct-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .pra-oct-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: #444;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .pra-oct-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pra-oct-btn {
+    background: transparent;
+    border: 1px solid #2A2A2A;
+    color: #888;
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: border-color 0.1s, color 0.1s;
+  }
+
+  .pra-oct-btn:hover { border-color: #E8A020; color: #E8A020; }
+
+  .pra-oct-disp {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    color: #E8A020;
+    min-width: 36px;
+    text-align: center;
+    font-weight: 700;
+  }
+
+  .pra-keyboard {
+    display: flex;
+    justify-content: center;
+    position: relative;
+    height: 80px;
+    gap: 0;
+  }
+
+  .pra-key {
+    position: relative;
+    width: 32px;
+    height: 80px;
+    background: #D8D8D0;
+    border: 1px solid #888;
+    border-top: none;
+    border-radius: 0 0 3px 3px;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: background 0.05s;
+    touch-action: none;
+    z-index: 1;
+  }
+
+  .pra-key:hover { background: #C8C8C0; }
+  .pra-key.pressed { background: #E8A020; border-color: #B07010; }
+
+  .pra-key.black {
+    position: absolute;
+    width: 20px;
+    height: 50px;
+    background: #1A1A1A;
+    border: 1px solid #111;
+    border-top: none;
+    border-radius: 0 0 2px 2px;
+    z-index: 3;
+    top: 0;
+  }
+
+  .pra-key.black:hover { background: #252525; }
+  .pra-key.black.pressed { background: #9A6A10; }
+</style>
+
+<div class="pra-root">
+  <div class="pra-header">
+    <div class="pra-logo">PRA32-U2 <span>/ SYNTHESIZER</span></div>
+    <div class="pra-status-bar">
+      <div class="pra-status-dot" id="status-dot"></div>
+      <span class="pra-status-text" id="status-text">OFFLINE</span>
+    </div>
+  </div>
+
+  <div class="pra-body">
+    <button class="pra-init-btn" id="init-btn">▶ INIT AUDIO ENGINE</button>
+
+    <div class="pra-preset-row">
+      <span class="pra-preset-label">PRESET</span>
+      <select class="pra-preset-select" id="preset-select">
+        <option value="-1">— Custom —</option>
+        <option value="0">00 · Initialization</option>
+        <option value="1">01 · Sync Lead</option>
+        <option value="2">02 · Synth Brass</option>
+        <option value="3">03 · Pluck Synth</option>
+        <option value="4">04 · Mono Synth</option>
+        <option value="5">05 · Synth Bass 1</option>
+        <option value="6">06 · Synth Bass 2</option>
+        <option value="7">07 · Synth Bass 3</option>
+        <option value="8">08 · Ethereal Pad</option>
+        <option value="9">09 · Gritty Bass</option>
+        <option value="10">10 · Chiptune Lead</option>
+        <option value="11">11 · Percussive Pluck</option>
+        <option value="12">12 · Classic Sweep</option>
+        <option value="13">13 · Dark Drone</option>
+        <option value="14">14 · Noise Percussion</option>
+        <option value="15">15 · Bell Lead</option>
+      </select>
+    </div>
+
+    <div class="pra-section-label">OSCILLATOR / FILTER</div>
+
+    <div class="pra-controls-grid" id="knobs-grid"></div>
+
+    <div class="pra-section-label">ENVELOPE / AMP</div>
+
+    <div class="pra-slider-group" id="sliders-group"></div>
+
+    <div class="pra-kbd-section">
+      <div class="pra-oct-row">
+        <span class="pra-oct-label">KEYBOARD</span>
+        <div class="pra-oct-controls">
+          <button class="pra-oct-btn" id="oct-down">OCT −</button>
+          <span class="pra-oct-disp" id="oct-disp">C4</span>
+          <button class="pra-oct-btn" id="oct-up">OCT +</button>
+        </div>
+      </div>
+      <div class="pra-keyboard" id="keyboard"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const knobDefs = [
+  { id: 'osc1wave', label: 'OSC 1\nWAVE', min: 0, max: 3, val: 0, fmt: v => ['SAW','SQR','TRI','SIN'][Math.round(v)] },
+  { id: 'osc2tune', label: 'OSC 2\nTUNE', min: -24, max: 24, val: 0, fmt: v => (v >= 0 ? '+' : '') + Math.round(v) },
+  { id: 'osc2wave', label: 'OSC 2\nWAVE', min: 0, max: 3, val: 1, fmt: v => ['SAW','SQR','TRI','SIN'][Math.round(v)] },
+  { id: 'oscmix', label: 'OSC\nMIX', min: 0, max: 127, val: 64, fmt: v => Math.round(v) },
+  { id: 'cutoff', label: 'FILTER\nCUTOFF', min: 0, max: 127, val: 80, fmt: v => Math.round(v) },
+  { id: 'reso', label: 'FILTER\nRESO', min: 0, max: 127, val: 20, fmt: v => Math.round(v) },
+  { id: 'envamt', label: 'ENV\nAMT', min: -64, max: 63, val: 30, fmt: v => (v >= 0 ? '+' : '') + Math.round(v) },
+  { id: 'lfoamt', label: 'LFO\nAMT', min: 0, max: 127, val: 0, fmt: v => Math.round(v) },
+];
+
+const sliderDefs = [
+  { id: 'attack', label: 'ATTACK', min: 0, max: 127, val: 10 },
+  { id: 'decay', label: 'DECAY', min: 0, max: 127, val: 50 },
+  { id: 'sustain', label: 'SUSTAIN', min: 0, max: 127, val: 80 },
+  { id: 'release', label: 'RELEASE', min: 0, max: 127, val: 30 },
+  { id: 'volume', label: 'VOLUME', min: 0, max: 127, val: 100 },
+];
+
+function buildKnobSVG(val, min, max, size) {
+  const norm = (val - min) / (max - min);
+  const startAngle = -220 * Math.PI / 180;
+  const endAngle = 40 * Math.PI / 180;
+  const angle = startAngle + norm * (endAngle - startAngle);
+  const cx = size / 2, cy = size / 2, r = size / 2 - 5;
+  const trackA1x = cx + r * Math.cos(startAngle);
+  const trackA1y = cy + r * Math.sin(startAngle);
+  const trackA2x = cx + r * Math.cos(endAngle);
+  const trackA2y = cy + r * Math.sin(endAngle);
+  const px = cx + r * Math.cos(angle);
+  const py = cy + r * Math.sin(angle);
+  const arcStartX = cx + r * Math.cos(startAngle);
+  const arcStartY = cy + r * Math.sin(startAngle);
+  const largeArc = norm > 0.72 ? 1 : 0;
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="pra-knob-svg">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="#1A1A1A" stroke="#222" stroke-width="1"/>
+    <path d="M ${trackA1x} ${trackA1y} A ${r} ${r} 0 1 1 ${trackA2x} ${trackA2y}" fill="none" stroke="#252525" stroke-width="3" stroke-linecap="round"/>
+    <path d="M ${arcStartX} ${arcStartY} A ${r} ${r} 0 ${largeArc} 1 ${px} ${py}" fill="none" stroke="#E8A020" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="${px}" cy="${py}" r="2.5" fill="#E8A020"/>
+    <circle cx="${cx}" cy="${cy}" r="${r * 0.35}" fill="#222"/>
+  </svg>`;
+}
+
+const grid = document.getElementById('knobs-grid');
+const knobState = {};
+knobDefs.forEach(def => {
+  knobState[def.id] = def.val;
+  const g = document.createElement('div');
+  g.className = 'pra-knob-group';
+  g.dataset.id = def.id;
+  const size = 52;
+  g.innerHTML = `<div class="knob-svg-wrap">${buildKnobSVG(def.val, def.min, def.max, size)}</div>
+    <div class="pra-knob-label">${def.label.replace('\n','<br>')}</div>
+    <div class="pra-knob-value" id="kv-${def.id}">${def.fmt(def.val)}</div>`;
+  let dragging = false, startY = 0, startVal = 0;
+  const onMove = e => {
+    if (!dragging) return;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const dy = startY - clientY;
+    const range = def.max - def.min;
+    const newVal = Math.min(def.max, Math.max(def.min, startVal + dy * range / 100));
+    knobState[def.id] = newVal;
+    g.querySelector('.knob-svg-wrap').innerHTML = buildKnobSVG(newVal, def.min, def.max, size);
+    document.getElementById('kv-' + def.id).textContent = def.fmt(newVal);
+  };
+  const onEnd = () => { dragging = false; g.classList.remove('active'); };
+  g.addEventListener('mousedown', e => { dragging = true; startY = e.clientY; startVal = knobState[def.id]; g.classList.add('active'); });
+  g.addEventListener('touchstart', e => { dragging = true; startY = e.touches[0].clientY; startVal = knobState[def.id]; g.classList.add('active'); e.preventDefault(); }, { passive: false });
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('touchmove', onMove, { passive: false });
+  window.addEventListener('mouseup', onEnd);
+  window.addEventListener('touchend', onEnd);
+  grid.appendChild(g);
+});
+
+const sg = document.getElementById('sliders-group');
+sliderDefs.forEach(def => {
+  const row = document.createElement('div');
+  row.className = 'pra-slider-row';
+  row.innerHTML = `<span class="pra-slider-name">${def.label}</span>
+    <input type="range" class="pra-slider" min="${def.min}" max="${def.max}" value="${def.val}" step="1" id="sl-${def.id}">
+    <span class="pra-slider-val" id="slv-${def.id}">${def.val}</span>`;
+  sg.appendChild(row);
+  const inp = row.querySelector('input');
+  const val = row.querySelector('#slv-' + def.id);
+  inp.addEventListener('input', () => { val.textContent = inp.value; });
+});
+
+const WHITE_NOTES = [0,2,4,5,7,9,11];
+const BLACK_OFFSETS = { 1: 0.6, 3: 1.6, 6: 3.6, 8: 4.6, 10: 5.6 };
+const OCTAVES = 2;
+let baseOctave = 4;
+const kbd = document.getElementById('keyboard');
+
+function buildKeyboard() {
+  kbd.innerHTML = '';
+  kbd.style.position = 'relative';
+  const keyW = 32, blackW = 20, whiteH = 80, blackH = 50;
+  const totalWhites = WHITE_NOTES.length * OCTAVES;
+  kbd.style.width = (totalWhites * keyW) + 'px';
+  kbd.style.height = whiteH + 'px';
+  kbd.style.margin = '0 auto';
+  for (let oct = 0; oct < OCTAVES; oct++) {
+    WHITE_NOTES.forEach((note, wi) => {
+      const k = document.createElement('div');
+      k.className = 'pra-key';
+      k.style.cssText = `position:absolute;left:${(oct*7+wi)*keyW}px;top:0;width:${keyW-1}px;height:${whiteH}px;`;
+      k.addEventListener('mousedown', () => k.classList.add('pressed'));
+      k.addEventListener('mouseup', () => k.classList.remove('pressed'));
+      k.addEventListener('mouseleave', () => k.classList.remove('pressed'));
+      k.addEventListener('touchstart', e => { k.classList.add('pressed'); e.preventDefault(); }, { passive: false });
+      k.addEventListener('touchend', () => k.classList.remove('pressed'));
+      kbd.appendChild(k);
+    });
+    Object.entries(BLACK_OFFSETS).forEach(([note, offset]) => {
+      const k = document.createElement('div');
+      k.className = 'pra-key black';
+      const leftPx = (oct * 7 + offset) * keyW + keyW/2 - blackW/2;
+      k.style.cssText = `position:absolute;left:${leftPx}px;top:0;width:${blackW}px;height:${blackH}px;`;
+      k.addEventListener('mousedown', e => { k.classList.add('pressed'); e.stopPropagation(); });
+      k.addEventListener('mouseup', () => k.classList.remove('pressed'));
+      k.addEventListener('mouseleave', () => k.classList.remove('pressed'));
+      k.addEventListener('touchstart', e => { k.classList.add('pressed'); e.preventDefault(); e.stopPropagation(); }, { passive: false });
+      k.addEventListener('touchend', () => k.classList.remove('pressed'));
+      kbd.appendChild(k);
+    });
+  }
+}
+
+buildKeyboard();
+
+document.getElementById('oct-up').addEventListener('click', () => {
+  baseOctave = Math.min(7, baseOctave + 1);
+  document.getElementById('oct-disp').textContent = 'C' + baseOctave;
+});
+document.getElementById('oct-down').addEventListener('click', () => {
+  baseOctave = Math.max(0, baseOctave - 1);
+  document.getElementById('oct-disp').textContent = 'C' + baseOctave;
+});
+
+document.getElementById('init-btn').addEventListener('click', function() {
+  const dot = document.getElementById('status-dot');
+  const txt = document.getElementById('status-text');
+  dot.classList.add('active');
+  txt.classList.add('active');
+  txt.textContent = 'ONLINE';
+  this.textContent = '◼ AUDIO ENGINE ACTIVE';
+  this.style.borderColor = '#555';
+  this.style.color = '#555';
+  this.style.cursor = 'default';
+  this.disabled = true;
+});
+</script>
