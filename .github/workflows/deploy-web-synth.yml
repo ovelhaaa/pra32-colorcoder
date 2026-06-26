@@ -33,6 +33,7 @@ jobs:
         run: |
           mkdir dist
           cp web_app/index.html dist/
+          cp web_app/styles.css dist/
           cp web_app/app.js dist/
           cp web_app/synth-processor.js dist/
           cp web_app/synth.wasm dist/
