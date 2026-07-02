@@ -26,6 +26,11 @@ startBtn.addEventListener('click', async () => {
             sampleRate: 48000
         });
 
+        // Ensure audio context is running before async gap
+        if (audioContext.state === 'suspended') {
+            await audioContext.resume();
+        }
+
         await audioContext.audioWorklet.addModule('synth-processor.js');
 
         synthNode = new AudioWorkletNode(audioContext, 'synth-processor', {
@@ -49,6 +54,10 @@ startBtn.addEventListener('click', async () => {
                 startBtn.disabled = true;
 
                 startOverlay.style.display = 'none';
+
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
 
                 setupMidi();
                 const presetsLoaded = await loadPresets();
@@ -452,7 +461,7 @@ function setupControls(presetsLoaded) {
     const baseNote = 60; // C4
     const keyboardDiv = document.getElementById('keyboard');
     const keyPattern = ['white', 'black', 'white', 'black', 'white', 'white', 'black', 'white', 'black', 'white', 'black', 'white'];
-    const desktopKeys = ['a', 'w', 's', 'e', 'd', 'f', 't', 'g', 'y', 'h', 'u', 'j', 'k'];
+    const desktopKeys = ['KeyA', 'KeyW', 'KeyS', 'KeyE', 'KeyD', 'KeyF', 'KeyT', 'KeyG', 'KeyY', 'KeyH', 'KeyU', 'KeyJ', 'KeyK'];
     let keys = [];
 
     function getNoteValue(noteOffset) {
@@ -651,7 +660,7 @@ function setupControls(presetsLoaded) {
 
     window.addEventListener('keydown', (e) => {
         if (e.repeat) return;
-        const noteOffset = keyMap[e.key];
+        const noteOffset = keyMap[e.code] !== undefined ? keyMap[e.code] : keyMap[e.key.toLowerCase()];
         if (noteOffset !== undefined) {
             const note = getNoteValue(noteOffset);
             sendNoteOn(note);
@@ -665,7 +674,7 @@ function setupControls(presetsLoaded) {
     });
 
     window.addEventListener('keyup', (e) => {
-        const noteOffset = keyMap[e.key];
+        const noteOffset = keyMap[e.code] !== undefined ? keyMap[e.code] : keyMap[e.key.toLowerCase()];
         const activeNote = activeNotes[noteOffset];
         if (noteOffset !== undefined && activeNote !== undefined) {
             sendNoteOff(activeNote);
