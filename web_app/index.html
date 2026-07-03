@@ -173,11 +173,23 @@
     </div>
 
     <div class="pra-body">
-        <div class="pra-preset-row">
-            <span class="pra-preset-label">PRESET</span>
-            <select class="pra-preset-select" id="presetSelect">
-                <option value="-1">— Custom —</option>
-            </select>
+        <div class="pra-preset-row" style="justify-content: space-between; flex-wrap: wrap;">
+            <div style="display: flex; gap: 12px; align-items: center; flex: 1; min-width: 300px;">
+                <span class="pra-preset-label">PRESET</span>
+                <select class="pra-preset-select" id="presetSelect" style="margin-right: 15px;">
+                    <option value="-1">— Custom —</option>
+                </select>
+                <span class="pra-preset-label">MIDI IN</span>
+                <select class="pra-preset-select" id="midiInputSelect">
+                    <option value="all">All Devices</option>
+                    <option value="none">None</option>
+                </select>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <button class="mutate-btn" id="exportPresetBtn">EXPORT</button>
+                <button class="mutate-btn" id="importPresetBtn">IMPORT</button>
+                <input type="file" id="importPresetInput" accept=".json" style="display: none;">
+            </div>
         </div>
 
         <div class="pra-main-controls">

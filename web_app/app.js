@@ -453,6 +453,56 @@ function setupControls(presetsLoaded) {
         });
     }
 
+    // JSON Export / Import
+    const exportBtn = document.getElementById('exportPresetBtn');
+    if (exportBtn) {
+        exportBtn.addEventListener('click', () => {
+            const presetData = {};
+            synthParameters.forEach(param => {
+                const paramKeyName = idToPresetKey[param.id] || param.label.replace(/ /g, '_');
+                presetData[paramKeyName] = param.val;
+            });
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(presetData, null, 2));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", "preset.json");
+            dlAnchorElem.click();
+        });
+    }
+
+    const importBtn = document.getElementById('importPresetBtn');
+    const importInput = document.getElementById('importPresetInput');
+    if (importBtn && importInput) {
+        importBtn.addEventListener('click', () => {
+            importInput.click();
+        });
+        importInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                try {
+                    const importedData = JSON.parse(evt.target.result);
+                    synthParameters.forEach(param => {
+                        const paramKeyName = idToPresetKey[param.id] || param.label.replace(/ /g, '_');
+                        if (importedData[paramKeyName] !== undefined) {
+                            const newValue = importedData[paramKeyName];
+                            param.val = newValue;
+                            updateSlider(param.id, newValue);
+                            sendCC(param.cc, newValue);
+                        }
+                    });
+                    if (presetSelect) presetSelect.value = "-1";
+                } catch (err) {
+                    console.error("Failed to parse preset JSON", err);
+                    alert("Invalid JSON file");
+                }
+                importInput.value = ""; // Reset input
+            };
+            reader.readAsText(file);
+        });
+    }
+
     // Keyboard
     let isMobileLayout = mobileMediaQuery.matches;
     let octaveOffset = 0;
@@ -690,20 +740,64 @@ function setupControls(presetsLoaded) {
 
 // --- WEB MIDI API ---
 
+let selectedMidiInputId = 'all';
+
 function setupMidi() {
     if (navigator.requestMIDIAccess) {
         navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
     } else {
         statusDiv.textContent += ' | Web MIDI API not supported';
     }
+
+    const midiSelect = document.getElementById('midiInputSelect');
+    if (midiSelect) {
+        midiSelect.addEventListener('change', (e) => {
+            selectedMidiInputId = e.target.value;
+        });
+    }
+}
+
+function updateMidiSelectUI(midiAccess) {
+    const midiSelect = document.getElementById('midiInputSelect');
+    if (!midiSelect) return;
+
+    // Keep 'all' and 'none', remove others
+    while (midiSelect.options.length > 2) {
+        midiSelect.remove(2);
+    }
+
+    const inputs = midiAccess.inputs.values();
+    for (let input = inputs.next(); input && !input.done; input = inputs.next()) {
+        const option = document.createElement('option');
+        option.value = input.value.id;
+        option.textContent = input.value.name || `Device ${input.value.id}`;
+        midiSelect.appendChild(option);
+    }
+
+    // Restore selection if valid
+    let validSelection = false;
+    for (let i = 0; i < midiSelect.options.length; i++) {
+        if (midiSelect.options[i].value === selectedMidiInputId) {
+            midiSelect.selectedIndex = i;
+            validSelection = true;
+            break;
+        }
+    }
+    if (!validSelection) {
+        selectedMidiInputId = 'all';
+        midiSelect.value = 'all';
+    }
 }
 
 function onMIDISuccess(midiAccess) {
+    updateMidiSelectUI(midiAccess);
+
     const inputs = midiAccess.inputs.values();
     for (let input = inputs.next(); input && !input.done; input = inputs.next()) {
         input.value.onmidimessage = onMIDIMessage;
     }
     midiAccess.onstatechange = (e) => {
+        updateMidiSelectUI(midiAccess);
         if (e.port.state === 'connected' && e.port.type === 'input') {
             e.port.onmidimessage = onMIDIMessage;
         }
@@ -715,6 +809,13 @@ function onMIDIFailure() {
 }
 
 function onMIDIMessage(message) {
+    if (selectedMidiInputId !== 'all' && message.currentTarget.id !== selectedMidiInputId) {
+        return; // Ignore messages from unselected devices
+    }
+    if (selectedMidiInputId === 'none') {
+        return;
+    }
+
     const command = message.data[0] >> 4;
     const channel = message.data[0] & 0xf;
     const data1 = message.data[1];
