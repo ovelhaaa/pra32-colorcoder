@@ -483,13 +483,37 @@ function setupControls(presetsLoaded) {
             reader.onload = (evt) => {
                 try {
                     const importedData = JSON.parse(evt.target.result);
+                    
+                    // Normalize keys to trim whitespace (factory presets have trailing spaces)
+                    const normalizedData = {};
+                    for (const key in importedData) {
+                        normalizedData[key.trim()] = importedData[key];
+                    }
+
                     synthParameters.forEach(param => {
                         const paramKeyName = idToPresetKey[param.id] || param.label.replace(/ /g, '_');
-                        if (importedData[paramKeyName] !== undefined) {
-                            const newValue = importedData[paramKeyName];
-                            param.val = newValue;
-                            updateSlider(param.id, newValue);
-                            sendCC(param.cc, newValue);
+                        let rawValue = normalizedData[paramKeyName];
+
+                        if (rawValue !== undefined) {
+                            let newValue = rawValue;
+                            
+                            // If it's the factory presets format: [ [current], [preset1, preset2...] ]
+                            if (Array.isArray(newValue)) {
+                                if (Array.isArray(newValue[0]) && newValue[0].length > 0) {
+                                    newValue = newValue[0][0]; // Extract the 'current' value
+                                } else if (newValue.length > 0) {
+                                    newValue = newValue[0];
+                                } else {
+                                    return; // Skip invalid array
+                                }
+                            }
+
+                            newValue = parseInt(newValue, 10);
+                            if (!isNaN(newValue)) {
+                                param.val = newValue;
+                                updateSlider(param.id, newValue);
+                                sendCC(param.cc, newValue);
+                            }
                         }
                     });
                     if (presetSelect) presetSelect.value = "-1";
