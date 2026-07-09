@@ -1,0 +1,33 @@
+name: Build Windows Plugin
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure CMake
+      run: cmake -S juce_plugin -B juce_plugin/build -DCMAKE_BUILD_TYPE=Release
+
+    - name: Build
+      run: cmake --build juce_plugin/build --config Release --target PRA32ColorcoderPlugin_Standalone PRA32ColorcoderPlugin_VST3 -j 4
+
+    - name: Upload VST3 Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: PRA32-Colorcoder-VST3
+        path: juce_plugin/build/PRA32ColorcoderPlugin_artefacts/Release/VST3/
+
+    - name: Upload Standalone Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: PRA32-Colorcoder-Standalone
+        path: juce_plugin/build/PRA32ColorcoderPlugin_artefacts/Release/Standalone/
