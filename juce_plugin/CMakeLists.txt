@@ -23,6 +23,9 @@ juce_add_plugin(PRA32ColorcoderPlugin
     IS_MIDI_EFFECT FALSE
 )
 
+# Generate JuceHeader.h
+juce_generate_juce_header(PRA32ColorcoderPlugin)
+
 # Source files
 target_sources(PRA32ColorcoderPlugin PRIVATE
     Source/PluginProcessor.cpp
