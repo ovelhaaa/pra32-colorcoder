@@ -14,17 +14,17 @@
 // Provide dummy digitalWrite for JUCE environment
 inline void digitalWrite(uint8_t pin, uint8_t val) {}
 
+// Variables normally defined by the Arduino sketch / wrapper
+EEPROMClass EEPROM;
+I2SClass g_i2s_output;
+uint8_t g_midi_ch = 0;
+
 #include "pra32-u2-synth.h"
 
 class PRA32Wrapper {
 public:
     PRA32_U2_Synth<false, false, false, 4> synth;
 };
-
-// Variables normally defined by the Arduino sketch / wrapper
-EEPROMClass EEPROM;
-I2SClass g_i2s_output;
-uint8_t g_midi_ch = 0;
 // -----------------------------------------------------------------------------
 
 //==============================================================================
