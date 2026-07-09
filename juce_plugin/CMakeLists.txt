@@ -21,6 +21,7 @@ juce_add_plugin(PRA32ColorcoderPlugin
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT FALSE
     IS_MIDI_EFFECT FALSE
+    VST3_CAN_REPLACE_VST2 FALSE
 )
 
 # Generate JuceHeader.h
