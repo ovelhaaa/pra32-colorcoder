@@ -1,11 +1,31 @@
 #include "PluginProcessor.h"
 
 // -----------------------------------------------------------------------------
-// Define the dummy globals required by the engine (mocking Arduino/embedded env)
+// DUMMY HEADERS / WRAPPER DEFINITIONS FOR THE EMBEDDED ENGINE
 // -----------------------------------------------------------------------------
+#include "Arduino.h"
+#include "EEPROM.h"
+#include "I2S.h"
+
+#ifndef PRA32_U2_USE_EMULATED_EEPROM
+#define PRA32_U2_USE_EMULATED_EEPROM 1
+#endif
+
+// Provide dummy digitalWrite for JUCE environment
+inline void digitalWrite(uint8_t pin, uint8_t val) {}
+
+#include "pra32-u2-synth.h"
+
+class PRA32Wrapper {
+public:
+    PRA32_U2_Synth<false, false, false, 4> synth;
+};
+
+// Variables normally defined by the Arduino sketch / wrapper
 EEPROMClass EEPROM;
 I2SClass g_i2s_output;
 uint8_t g_midi_ch = 0;
+// -----------------------------------------------------------------------------
 
 //==============================================================================
 PRA32ColorcoderAudioProcessor::PRA32ColorcoderAudioProcessor()
@@ -16,12 +36,11 @@ PRA32ColorcoderAudioProcessor::PRA32ColorcoderAudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       ),
-       apvts(*this, nullptr, "Parameters", createParameterLayout())
+                       ), apvts(*this, nullptr, "Parameters", createParameterLayout()), synthWrapper(std::make_unique<PRA32Wrapper>())
 {
     // Initialize the engine, just like in wasm_wrapper.cpp
-    synth.initialize();
-    synth.program_change(15); // Load Initial preset
+    synthWrapper->synth.initialize();
+    synthWrapper->synth.program_change(15); // Load Initial preset
 
     // Cache the atomic pointers for fast polling in the audio thread
     for (const auto& p : SynthParameters::getParameters()) {
@@ -164,7 +183,7 @@ void PRA32ColorcoderAudioProcessor::processBlock (juce::AudioBuffer<float>& buff
             float val = pb.valuePtr->load(std::memory_order_relaxed);
             if (val != pb.lastValue) {
                 pb.lastValue = val;
-                synth.control_change(pb.cc, static_cast<uint8_t>(val));
+                synthWrapper->synth.control_change(pb.cc, static_cast<uint8_t>(val));
             }
         }
     }
@@ -172,31 +191,21 @@ void PRA32ColorcoderAudioProcessor::processBlock (juce::AudioBuffer<float>& buff
     // 1. Process MIDI Events
     for (const auto metadata : midiMessages)
     {
-        auto message = metadata.getMessage();
-        if (message.isNoteOn())
-        {
-            synth.note_on(message.getNoteNumber(), message.getVelocity());
-        }
-        else if (message.isNoteOff())
-        {
-            synth.note_off(message.getNoteNumber());
-        }
-        else if (message.isController())
-        {
-            synth.control_change(message.getControllerNumber(), message.getControllerValue());
-        }
-        else if (message.isPitchWheel())
-        {
-            // Pitch bend in JUCE is 0-16383, center is 8192
-            // The synth expects lsb, msb.
-            int pitchBendValue = message.getPitchWheelValue();
-            uint8_t lsb = pitchBendValue & 0x7F;
-            uint8_t msb = (pitchBendValue >> 7) & 0x7F;
-            synth.pitch_bend(lsb, msb);
-        }
-        else if (message.isProgramChange())
-        {
-            synth.program_change(message.getProgramChangeNumber());
+        auto msg = metadata.getMessage();
+        if (msg.isNoteOn()) {
+            synthWrapper->synth.note_on(msg.getNoteNumber(), msg.getVelocity());
+        } else if (msg.isNoteOff()) {
+            synthWrapper->synth.note_off(msg.getNoteNumber());
+        } else if (msg.isController()) {
+            synthWrapper->synth.control_change(msg.getControllerNumber(), msg.getControllerValue());
+        } else if (msg.isPitchWheel()) {
+            // JUCE pitch wheel is 0-16383, center 8192
+            int value = msg.getPitchWheelValue();
+            uint8_t lsb = value & 0x7F;
+            uint8_t msb = (value >> 7) & 0x7F;
+            synthWrapper->synth.pitch_bend(lsb, msb);
+        } else if (msg.isProgramChange()) {
+            synthWrapper->synth.program_change(msg.getProgramChangeNumber());
         }
     }
 
@@ -213,8 +222,9 @@ void PRA32ColorcoderAudioProcessor::processBlock (juce::AudioBuffer<float>& buff
             lastL = nextL;
             lastR = nextR;
 
+            // Generate exactly one sample from the engine
             int16_t right_out = 0;
-            int16_t left_out = synth.process(0, 0, right_out);
+            int16_t left_out = synthWrapper->synth.process(0, 0, right_out);
             
             // Convert from int16 to float (-1.0 to 1.0)
             nextL = left_out / 32768.0f;

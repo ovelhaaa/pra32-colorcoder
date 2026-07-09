@@ -2,30 +2,9 @@
 
 #include <JuceHeader.h>
 
-// -----------------------------------------------------------------------------
-// DUMMY HEADERS / WRAPPER DEFINITIONS FOR THE EMBEDDED ENGINE
-// -----------------------------------------------------------------------------
-// As seen in web_app/wasm_wrapper.cpp, the engine requires these headers.
-// By including web_app/ in target_include_directories, we satisfy them.
-#include "Arduino.h"
-#include "EEPROM.h"
-#include "I2S.h"
+// Forward declaration of the wrapper class
+class PRA32Wrapper;
 
-// Definition required for the engine (avoids specific embedded hardware calls)
-#ifndef PRA32_U2_USE_EMULATED_EEPROM
-#define PRA32_U2_USE_EMULATED_EEPROM 1
-#endif
-
-// Variables normally defined by the Arduino sketch / wrapper
-extern EEPROMClass EEPROM;
-extern I2SClass g_i2s_output;
-extern uint8_t g_midi_ch;
-
-// Provide dummy digitalWrite for JUCE environment
-inline void digitalWrite(uint8_t pin, uint8_t val) {}
-
-// Include the core PRA32-U2 engine
-#include "pra32-u2-synth.h"
 #include "SynthParameters.h"
 #include <vector>
 
@@ -76,7 +55,7 @@ private:
     // Core Engine Instantiation
     // Based on `web_app/wasm_wrapper.cpp`
     // -------------------------------------------------------------------------
-    PRA32_U2_Synth<false, false, false, 4> synth;
+    std::unique_ptr<PRA32Wrapper> synthWrapper;
     
     // -------------------------------------------------------------------------
     // JUCE Value Tree State for Parameter Management
