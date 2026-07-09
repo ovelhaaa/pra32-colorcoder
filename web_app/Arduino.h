@@ -12,6 +12,10 @@ typedef unsigned char byte;
 #define HIGH 1
 #define LOW 0
 
+#ifdef _MSC_VER
+#define __attribute__(x)
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
