@@ -57,3 +57,6 @@ target_link_libraries(PRA32ColorcoderPlugin PRIVATE
 
 # C++20 for JUCE 8 compatibility
 target_compile_features(PRA32ColorcoderPlugin PUBLIC cxx_std_20)
+
+# Forcefully disable VST2 compatibility in VST3 (fixes missing vstfxstore.h)
+target_compile_definitions(PRA32ColorcoderPlugin PUBLIC JUCE_VST3_CAN_REPLACE_VST2=0)
