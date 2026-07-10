@@ -76,7 +76,7 @@ void PRA32TabComponent::resized()
 PRA32ColorcoderAudioProcessorEditor::PRA32ColorcoderAudioProcessorEditor (PRA32ColorcoderAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p), 
       tabbedComponent(juce::TabbedButtonBar::Orientation::TabsAtTop),
-      keyboardComponent(keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard)
+      keyboardComponent(audioProcessor.keyboardState, juce::MidiKeyboardComponent::horizontalKeyboard)
 {
     setLookAndFeel(&customLookAndFeel);
 
@@ -87,6 +87,46 @@ PRA32ColorcoderAudioProcessorEditor::PRA32ColorcoderAudioProcessorEditor (PRA32C
         tabbedComponent.addTab(tab, juce::Colour(0xff1E1E1E), new PRA32TabComponent(audioProcessor, tab), true);
     }
     
+    const char* presetNames[] = {
+        "00 · Initialization", "01 · Sync Lead", "02 · Synth Brass", "03 · Pluck Synth",
+        "04 · Mono Synth", "05 · Synth Bass 1", "06 · Synth Bass 2", "07 · Synth Bass 3",
+        "08 · Ethereal Pad", "09 · Gritty Bass", "10 · Chiptune Lead", "11 · Percussive Pluck",
+        "12 · Classic Sweep", "13 · Dark Drone", "14 · Noise Percussion", "15 · Bell Lead"
+    };
+    for (int i = 0; i < 16; ++i) {
+        presetComboBox.addItem(presetNames[i], i + 1);
+    }
+    presetComboBox.setTextWhenNothingSelected("Select Preset...");
+    
+    presetComboBox.onChange = [this]() {
+        audioProcessor.loadPreset(presetComboBox.getSelectedId() - 1);
+    };
+
+    loadButton.onClick = [this]() {
+        fileChooser = std::make_unique<juce::FileChooser>("Load Preset", juce::File::getSpecialLocation(juce::File::userDocumentsDirectory), "*.json");
+        auto folderChooserFlags = juce::FileBrowserComponent::openMode | juce::FileBrowserComponent::canSelectFiles;
+        fileChooser->launchAsync(folderChooserFlags, [this] (const juce::FileChooser& fc) {
+            auto file = fc.getResult();
+            if (file.existsAsFile()) {
+                audioProcessor.loadPresetFromJson(file.loadFileAsString());
+            }
+        });
+    };
+
+    saveButton.onClick = [this]() {
+        fileChooser = std::make_unique<juce::FileChooser>("Save Preset", juce::File::getSpecialLocation(juce::File::userDocumentsDirectory), "*.json");
+        auto folderChooserFlags = juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles;
+        fileChooser->launchAsync(folderChooserFlags, [this] (const juce::FileChooser& fc) {
+            auto file = fc.getResult();
+            if (file != juce::File{}) {
+                file.replaceWithText(audioProcessor.savePresetToJson());
+            }
+        });
+    };
+
+    addAndMakeVisible(presetComboBox);
+    addAndMakeVisible(loadButton);
+    addAndMakeVisible(saveButton);
     addAndMakeVisible(tabbedComponent);
     addAndMakeVisible(keyboardComponent);
     
@@ -121,4 +161,9 @@ void PRA32ColorcoderAudioProcessorEditor::resized()
 {
     tabbedComponent.setBounds(20, 60, getWidth() - 40, getHeight() - 170);
     keyboardComponent.setBounds(20, getHeight() - 90, getWidth() - 40, 70);
+    
+    int rightMargin = getWidth() - 20;
+    saveButton.setBounds(rightMargin - 60, 10, 60, 20);
+    loadButton.setBounds(saveButton.getX() - 70, 10, 60, 20);
+    presetComboBox.setBounds(loadButton.getX() - 160, 10, 150, 20);
 }

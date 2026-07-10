@@ -28,6 +28,112 @@ public:
 // -----------------------------------------------------------------------------
 
 //==============================================================================
+static const char* factoryPresetsJson = R"(
+{
+  "_version       " : "PRA32-U2 Editor v2.12.0",
+  "_comment       " : "Current  #0   #1   #2   #3   #4   #5   #6   #7     #8   #9   #10  #11  #12  #13  #14  #15  ",
+  "OSC_1_WAVE     " : [ [0], [0  , 0  , 76 , 127, 0  , 25 , 0  , 0  , 76 , 0  , 25 , 0  , 0  , 25 , 127, 76 ] ],
+  "MIXER_SUB_OSC  " : [ [64], [64 , 64 , 64 , 64 , 127, 96 , 127, 64 , 64 , 127, 64 , 64 , 64 , 64 , 1  , 64 ] ],
+  "OSC_1_SHAPE    " : [ [64], [64 , 64 , 0  , 0  , 64 , 64 , 0  , 0  , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 100] ],
+  "OSC_1_MORPH    " : [ [0], [0  , 127, 108, 64 , 0  , 127, 0  , 0  , 0  , 0  , 64 , 0  , 0  , 0  , 0  , 0  ] ],
+  "OSC_2_WAVE     " : [ [0], [0  , 0  , 0  , 0  , 0  , 25 , 0  , 0  , 76 , 0  , 25 , 0  , 0  , 25 , 0  , 76 ] ],
+  "MIXER_OSC_MIX  " : [ [64], [64 , 0  , 64 , 0  , 64 , 0  , 64 , 0  , 64 , 64 , 64 , 127, 64 , 64 , 0  , 64 ] ],
+  "OSC_2_COARSE   " : [ [64], [64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 52 , 64 , 88 ] ],
+  "OSC_2_PITCH    " : [ [72], [72 , 72 , 72 , 72 , 66 , 72 , 66 , 64 , 72 , 72 , 72 , 72 , 59 , 72 , 72 , 72 ] ],
+  "FILTER_CUTOFF  " : [ [112], [112, 112, 88 , 127, 88 , 112, 40 , 127, 90 , 80 , 127, 60 , 40 , 30 , 100, 127] ],
+  "FILTER_RESO    " : [ [48], [48 , 48 , 48 , 48 , 48 , 48 , 80 , 0  , 30 , 80 , 48 , 48 , 90 , 40 , 0  , 48 ] ],
+  "FILTER_EG_AMT  " : [ [40], [40 , 64 , 64 , 64 , 76 , 64 , 88 , 64 , 64 , 100, 40 , 110, 100, 64 , 40 , 40 ] ],
+  "FILTER_KEY_TRK " : [ [96], [96 , 96 , 96 , 96 , 64 , 64 , 64 , 64 , 96 , 96 , 96 , 96 , 96 , 96 , 96 , 96 ] ],
+  "EG_ATTACK      " : [ [96], [96 , 32 , 32 , 32 , 32 , 32 , 32 , 0  , 110, 0  , 96 , 0  , 80 , 96 , 96 , 96 ] ],
+  "EG_DECAY       " : [ [96], [96 , 32 , 96 , 32 , 32 , 96 , 100, 0  , 96 , 40 , 96 , 50 , 60 , 96 , 96 , 96 ] ],
+  "EG_SUSTAIN     " : [ [0], [0  , 127, 0  , 127, 127, 0  , 0  , 127, 0  , 20 , 0  , 0  , 64 , 64 , 0  , 0  ] ],
+  "EG_RELEASE     " : [ [32], [32 , 32 , 32 , 32 , 32 , 32 , 32 , 0  , 110, 32 , 32 , 32 , 32 , 32 , 32 , 32 ] ],
+  "EG_OSC_AMT     " : [ [64], [64 , 64 , 72 , 64 , 64 , 72 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 ] ],
+  "EG_OSC_DST     " : [ [0], [0  , 0  , 127, 0  , 0  , 127, 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
+  "VOICE_MODE     " : [ [0], [0  , 0  , 0  , 0  , 127, 76 , 76 , 127, 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
+  "PORTAMENTO     " : [ [48], [48 , 0  , 0  , 0  , 48 , 48 , 0  , 0  , 48 , 48 , 48 , 48 , 48 , 48 , 48 , 48 ] ],
+  "LFO_WAVE       " : [ [0], [0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
+  "LFO_FADE_TIME  " : [ [0], [0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
+  "LFO_RATE       " : [ [80], [80 , 80 , 80 , 80 , 80 , 80 , 80 , 80 , 80 , 80 , 100, 80 , 80 , 80 , 80 , 80 ] ],
+  "LFO_DEPTH      " : [ [0], [0  , 0  , 0  , 127, 8  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
+  "LFO_OSC_AMT    " : [ [64], [64 , 64 , 64 , 64 , 96 , 72 , 64 , 64 , 64 , 64 , 90 , 64 , 64 , 64 , 64 , 64 ] ],
+  "LFO_OSC_DST    " : [ [0], [0  , 0  , 127, 0  , 0  , 127, 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
+  "LFO_FILTER_AMT " : [ [76], [76 , 76 , 76 , 64 , 64 , 64 , 76 , 64 , 76 , 76 , 76 , 76 , 76 , 76 , 76 , 76 ] ],
+  "AMP_GAIN       " : [ [100], [100, 100, 120, 100, 100, 90 , 110, 100, 120, 120, 110, 127, 110, 127, 127, 120] ],
+  "AMP_ATTACK     " : [ [32], [32 , 32 , 32 , 32 , 32 , 32 , 32 , 0  , 90 , 0  , 32 , 0  , 0  , 100, 0  , 0  ] ],
+  "AMP_DECAY      " : [ [32], [32 , 32 , 32 , 32 , 32 , 32 , 32 , 0  , 32 , 40 , 32 , 50 , 32 , 32 , 30 , 80 ] ],
+  "AMP_SUSTAIN    " : [ [127], [127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 0  , 127, 127, 0  , 0  ] ],
+  "AMP_RELEASE    " : [ [32], [32 , 32 , 32 , 32 , 32 , 32 , 32 , 0  , 90 , 32 , 32 , 32 , 40 , 100, 20 , 60 ] ],
+  "FILTER_MODE    " : [ [0], [0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
+  "P_BEND_RANGE   " : [ [2], [2  , 2  , 2  , 2  , 2  , 2  , 2  , 2  , 2  , 2  , 2  , 2  , 2  , 2  , 2  , 2  ] ],
+  "EG_AMP_MOD     " : [ [0], [0  , 127, 127, 127, 0  , 0  , 127, 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
+  "REL_EQ_DECAY   " : [ [127], [127, 127, 127, 127, 127, 127, 127, 0  , 127, 127, 127, 127, 127, 127, 127, 127] ],
+  "BTH_FILTER_AMT " : [ [64], [64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 ] ],
+  "BTH_AMP_MOD    " : [ [0], [0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 64 , 0  , 0  , 0  , 0  , 0  , 0  ] ],
+  "EG_VEL_SENS    " : [ [0], [0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
+  "AMP_VEL_SENS   " : [ [0], [0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
+  "AFT_T_LFO_AMT  " : [ [0], [0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
+  "VOICE_ASGN_MODE" : [ [0], [0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
+  "PAN            " : [ [64], [64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 ] ],
+  "OSC_DRIFT      " : [ [32], [32 , 32 , 32 , 32 , 32 , 32 , 32 , 32 , 32 , 32 , 32 , 32 , 32 , 32 , 32 , 32 ] ],
+  "OSC_SAW_W_MODE " : [ [127], [127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127] ],
+  "CHORUS_MIX     " : [ [127], [127, 127, 127, 127, 127, 127, 127, 0  , 127, 0  , 0  , 127, 127, 127, 127, 127] ],
+  "CHORUS_RATE    " : [ [64], [64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 ] ],
+  "CHORUS_DEPTH   " : [ [64], [64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 ] ],
+  "DELAY_LEVEL    " : [ [64], [64 , 64 , 64 , 64 , 64 , 64 , 64 , 0  , 80 , 0  , 0  , 50 , 64 , 64 , 64 , 80 ] ],
+  "DELAY_MODE     " : [ [0], [0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
+  "DELAY_TIME     " : [ [87], [87 , 87 , 87 , 87 , 87 , 87 , 87 , 87 , 87 , 87 , 87 , 87 , 87 , 87 , 87 , 87 ] ],
+  "DELAY_FEEDBACK " : [ [64], [64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 ] ],
+  "_end           " : ""
+}
+)";
+
+static juce::String getPresetKeyForParam(const juce::String& paramId, const juce::String& paramLabel)
+{
+    if (paramId == "osc1Wave") return "OSC_1_WAVE";
+    if (paramId == "osc1Shape") return "OSC_1_SHAPE";
+    if (paramId == "osc1Morph") return "OSC_1_MORPH";
+    if (paramId == "osc2Wave") return "OSC_2_WAVE";
+    if (paramId == "osc2Coarse") return "OSC_2_COARSE";
+    if (paramId == "osc2Pitch") return "OSC_2_PITCH";
+    if (paramId == "oscMix") return "MIXER_OSC_MIX";
+    if (paramId == "subOsc") return "MIXER_SUB_OSC";
+    if (paramId == "oscDrift") return "OSC_DRIFT";
+    if (paramId == "sawWMode") return "OSC_SAW_W_MODE";
+    if (paramId == "filterCutoff") return "FILTER_CUTOFF";
+    if (paramId == "filterReso") return "FILTER_RESO";
+    if (paramId == "filterMode") return "FILTER_MODE";
+    if (paramId == "egFltAmt") return "FILTER_EG_AMT";
+    if (paramId == "filterKeyTrk") return "FILTER_KEY_TRK";
+    if (paramId == "bthFltAmt") return "BTH_FILTER_AMT";
+    if (paramId == "relEqDcy") return "REL_EQ_DECAY";
+    if (paramId == "egOscAmt") return "EG_OSC_AMT";
+    if (paramId == "egAttack") return "EG_ATTACK";
+    if (paramId == "egDecay") return "EG_DECAY";
+    if (paramId == "egSustain") return "EG_SUSTAIN";
+    if (paramId == "egRelease") return "EG_RELEASE";
+    if (paramId == "ampAttack") return "AMP_ATTACK";
+    if (paramId == "ampDecay") return "AMP_DECAY";
+    if (paramId == "ampSustain") return "AMP_SUSTAIN";
+    if (paramId == "ampRelease") return "AMP_RELEASE";
+    if (paramId == "lfoWave") return "LFO_WAVE";
+    if (paramId == "lfoRate") return "LFO_RATE";
+    if (paramId == "lfoFltAmt") return "LFO_FILTER_AMT";
+    if (paramId == "lfoOscAmt") return "LFO_OSC_AMT";
+    if (paramId == "lfoFadeTime") return "LFO_FADE_TIME";
+    if (paramId == "pbRange") return "P_BEND_RANGE";
+    if (paramId == "choRate") return "CHORUS_RATE";
+    if (paramId == "choDepth") return "CHORUS_DEPTH";
+    if (paramId == "delayTime") return "DELAY_TIME";
+    if (paramId == "delayDepth") return "DELAY_LEVEL";
+    if (paramId == "pan") return "PAN";
+    if (paramId == "ampGain") return "AMP_GAIN";
+    if (paramId == "portaTime") return "PORTAMENTO";
+    
+    return paramLabel.replace(" ", "_");
+}
+
+//==============================================================================
 PRA32ColorcoderAudioProcessor::PRA32ColorcoderAudioProcessor()
      : AudioProcessor (BusesProperties()
                      #if ! JucePlugin_IsMidiEffect
@@ -133,6 +239,102 @@ void PRA32ColorcoderAudioProcessor::changeProgramName (int index, const juce::St
 {
 }
 
+void PRA32ColorcoderAudioProcessor::loadPreset(int index)
+{
+    juce::var parsedJson = juce::JSON::parse(factoryPresetsJson);
+    if (!parsedJson.isObject()) return;
+    
+    auto* obj = parsedJson.getDynamicObject();
+    
+    for (const auto& p : SynthParameters::getParameters())
+    {
+        juce::String presetKey = getPresetKeyForParam(p.id, p.label);
+        
+        juce::var paramVar;
+        bool found = false;
+        for (auto& prop : obj->getProperties()) {
+            if (prop.name.toString().trim() == presetKey) {
+                paramVar = prop.value;
+                found = true;
+                break;
+            }
+        }
+        
+        if (found && paramVar.isArray()) {
+            auto* arr = paramVar.getArray();
+            if (arr->size() > 1 && arr->getReference(1).isArray()) {
+                auto* presetArr = arr->getReference(1).getArray();
+                if (index >= 0 && index < presetArr->size()) {
+                    int newValue = presetArr->getReference(index);
+                    if (auto* param = apvts.getParameter(p.id)) {
+                        param->setValueNotifyingHost(param->convertTo0to1((float)newValue));
+                    }
+                }
+            }
+        }
+    }
+}
+
+void PRA32ColorcoderAudioProcessor::loadPresetFromJson(const juce::String& jsonString)
+{
+    juce::var parsedJson = juce::JSON::parse(jsonString);
+    if (!parsedJson.isObject()) return;
+    
+    auto* obj = parsedJson.getDynamicObject();
+    
+    for (const auto& p : SynthParameters::getParameters())
+    {
+        juce::String presetKey = getPresetKeyForParam(p.id, p.label);
+        
+        juce::var paramVar;
+        bool found = false;
+        for (auto& prop : obj->getProperties()) {
+            if (prop.name.toString().trim() == presetKey) {
+                paramVar = prop.value;
+                found = true;
+                break;
+            }
+        }
+        
+        if (found) {
+            int newValue = p.def;
+            if (paramVar.isArray()) {
+                auto* arr = paramVar.getArray();
+                if (arr->size() > 0) {
+                    if (arr->getReference(0).isArray()) {
+                        auto* currentArr = arr->getReference(0).getArray();
+                        if (currentArr->size() > 0) {
+                            newValue = currentArr->getReference(0);
+                        }
+                    } else {
+                        newValue = arr->getReference(0);
+                    }
+                }
+            } else {
+                newValue = (int)paramVar;
+            }
+            
+            if (auto* param = apvts.getParameter(p.id)) {
+                param->setValueNotifyingHost(param->convertTo0to1((float)newValue));
+            }
+        }
+    }
+}
+
+juce::String PRA32ColorcoderAudioProcessor::savePresetToJson()
+{
+    juce::DynamicObject::Ptr obj = new juce::DynamicObject();
+    
+    for (const auto& p : SynthParameters::getParameters())
+    {
+        juce::String presetKey = getPresetKeyForParam(p.id, p.label);
+        float currentVal = *apvts.getRawParameterValue(p.id);
+        obj->setProperty(presetKey, (int)currentVal);
+    }
+    
+    return juce::JSON::toString(juce::var(obj.get()));
+}
+
 //==============================================================================
 void PRA32ColorcoderAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
@@ -189,6 +391,8 @@ void PRA32ColorcoderAudioProcessor::processBlock (juce::AudioBuffer<float>& buff
     }
 
     // 1. Process MIDI Events
+    keyboardState.processNextMidiBuffer(midiMessages, 0, buffer.getNumSamples(), true);
+
     for (const auto metadata : midiMessages)
     {
         auto msg = metadata.getMessage();

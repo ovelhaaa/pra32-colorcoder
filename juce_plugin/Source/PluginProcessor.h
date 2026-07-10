@@ -50,6 +50,12 @@ public:
     // Direct access to APVTS for the Editor
     juce::AudioProcessorValueTreeState& getAPVTS() { return apvts; }
 
+    juce::MidiKeyboardState keyboardState;
+
+    void loadPreset(int index);
+    void loadPresetFromJson(const juce::String& jsonString);
+    juce::String savePresetToJson();
+
 private:
     // -------------------------------------------------------------------------
     // Core Engine Instantiation

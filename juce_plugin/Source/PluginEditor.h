@@ -41,8 +41,12 @@ private:
     PRA32LookAndFeel customLookAndFeel;
 
     juce::TabbedComponent tabbedComponent;
-    juce::MidiKeyboardState keyboardState;
     juce::MidiKeyboardComponent keyboardComponent;
+
+    juce::ComboBox presetComboBox;
+    juce::TextButton loadButton{"Load"};
+    juce::TextButton saveButton{"Save"};
+    std::unique_ptr<juce::FileChooser> fileChooser;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PRA32ColorcoderAudioProcessorEditor)
 };
