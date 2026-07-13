@@ -5,6 +5,7 @@ class SynthProcessor extends AudioWorkletProcessor {
         this.memory = null;
         this.leftBufferPtr = null;
         this.rightBufferPtr = null;
+        this.smoothedInputGain = 0.35;
 
         this.port.onmessage = (event) => {
             if (event.data.type === 'loadWasm') {
@@ -61,6 +62,12 @@ class SynthProcessor extends AudioWorkletProcessor {
                 defaultValue: 0,
                 minValue: 0,
                 maxValue: 1,
+            },
+            {
+                name: 'inputGain',
+                defaultValue: 0.35,
+                minValue: 0.1,
+                maxValue: 1.0,
             }
         ];
     }
@@ -80,10 +87,17 @@ class SynthProcessor extends AudioWorkletProcessor {
 
         const bitCrush = parameters.bitCrush.length > 0 ? parameters.bitCrush[0] : 0;
         const pwmSimulate = parameters.pwmSimulate.length > 0 ? parameters.pwmSimulate[0] : 0;
+        const targetInputGain = parameters.inputGain.length > 0 ? parameters.inputGain[0] : 0.35;
+        const smoothingCoefficient = 0.02;
 
         for (let i = 0; i < numSamples; i++) {
+            this.smoothedInputGain += (targetInputGain - this.smoothedInputGain) * smoothingCoefficient;
+
             let leftSample = leftBuffer[i] / 32768.0;
             let rightSample = rightBuffer[i] / 32768.0;
+
+            leftSample *= this.smoothedInputGain;
+            rightSample *= this.smoothedInputGain;
 
             // Hacker touch: bitcrush (reduce resolution from 16-bit to roughly 12-bit or lower)
             if (bitCrush > 0) {
