@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 #include "pra32-u2-common.h"
 #include "pra32-u2-control-panel-page-table.h"
 
@@ -12,7 +14,7 @@ extern volatile uint32_t s_current_page_index[NUMBER_OF_PAGE_GROUPS];
 extern volatile int32_t  s_adc_current_value[3];
 extern volatile uint8_t  s_adc_control_value[3];
 extern volatile uint8_t  s_adc_control_target[3];
-extern volatile boolean  s_adc_control_catched[3];
+extern volatile bool     s_adc_control_catched[3];
 
 extern uint8_t  s_play_mode;
 extern int8_t   s_panel_transpose;

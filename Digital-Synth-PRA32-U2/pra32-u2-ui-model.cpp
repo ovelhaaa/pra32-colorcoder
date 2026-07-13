@@ -13,7 +13,7 @@ volatile uint32_t s_current_page_index[NUMBER_OF_PAGE_GROUPS] = {
 volatile int32_t  s_adc_current_value[3] = {};
 volatile uint8_t  s_adc_control_value[3] = {};
 volatile uint8_t  s_adc_control_target[3] = { 0xFF, 0xFF, 0xFF };
-volatile boolean  s_adc_control_catched[3] = {};
+volatile bool     s_adc_control_catched[3] = {};
 
 uint8_t  s_play_mode                = 0;
 int8_t   s_panel_transpose          = 0;
