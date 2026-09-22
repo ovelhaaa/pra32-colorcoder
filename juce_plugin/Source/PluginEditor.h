@@ -59,7 +59,8 @@ private:
 
 //==============================================================================
 class PRA32ColorcoderAudioProcessorEditor  : public juce::AudioProcessorEditor,
-                                             private juce::ChangeListener
+                                             private juce::ChangeListener,
+                                             private juce::ValueTree::Listener
 {
 public:
     explicit PRA32ColorcoderAudioProcessorEditor (PRA32ColorcoderAudioProcessor&);
@@ -76,7 +77,11 @@ private:
     void updateKeyboardRange();
 
     void changeListenerCallback (juce::ChangeBroadcaster*) override;
+    void valueTreePropertyChanged (juce::ValueTree&, const juce::Identifier&) override;
     void storeUiState();
+
+    void requestConfirmation (const juce::String& title, const juce::String& message,
+                              const juce::String& confirmText, std::function<void()> action);
 
     PRA32ColorcoderAudioProcessor& audioProcessor;
     PRA32LookAndFeel customLookAndFeel;
@@ -87,9 +92,13 @@ private:
     juce::TextButton presetPrevButton { "<" };
     juce::TextButton presetNextButton { ">" };
     ValueReadout presetDisplay;
+    juce::TextButton initButton { "INIT" };
     juce::TextButton loadButton { "LOAD JSON" };
     juce::TextButton saveButton { "SAVE JSON" };
     juce::TextButton keyboardButton { "KEYS" };
+
+    PRA32ConfirmOverlay confirmOverlay;
+    bool lastEdited = false;
 
     PRA32Keyboard keyboardComponent;
     std::unique_ptr<juce::FileChooser> fileChooser;

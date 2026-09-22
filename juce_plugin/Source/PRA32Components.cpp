@@ -952,6 +952,15 @@ void ValueReadout::setColours (juce::Colour p, juce::Colour s)
     repaint();
 }
 
+void ValueReadout::setModified (bool shouldShowModifiedBadge)
+{
+    if (modified != shouldShowModifiedBadge)
+    {
+        modified = shouldShowModifiedBadge;
+        repaint();
+    }
+}
+
 void ValueReadout::paint (juce::Graphics& g)
 {
     drawInsetWell (g, getLocalBounds().toFloat(), sc (3.0f), 0.9f);
@@ -974,4 +983,91 @@ void ValueReadout::paint (juce::Graphics& g)
     g.setFont (legendFont());
     g.setColour (secondaryColour);
     g.drawFittedText (secondary, r, justification, 1);
+
+    if (modified)
+    {
+        const float d = sc (5.0f);
+        auto dot = juce::Rectangle<float> (d, d)
+                       .withCentre ({ (float) getWidth() - sc (7.0f), (float) getHeight() - sc (7.0f) });
+        g.setColour (amber);
+        g.fillEllipse (dot);
+        g.setColour (engraveShadow.withAlpha (0.6f));
+        g.drawEllipse (dot, 0.8f);
+    }
+}
+
+//==============================================================================
+PRA32ConfirmOverlay::PRA32ConfirmOverlay()
+{
+    setInterceptsMouseClicks (true, true);
+    setVisible (false);
+
+    addAndMakeVisible (confirmButton);
+    addAndMakeVisible (cancelButton);
+
+    confirmButton.onClick = [this] ()
+    {
+        setVisible (false);
+        if (callback != nullptr)
+            callback();
+    };
+    cancelButton.onClick = [this] () { setVisible (false); };
+}
+
+void PRA32ConfirmOverlay::ask (const juce::String& t, const juce::String& m,
+                               const juce::String& confirmText, std::function<void()> onConfirm)
+{
+    title = t;
+    message = m;
+    callback = std::move (onConfirm);
+
+    confirmButton.setButtonText (confirmText.isNotEmpty() ? confirmText
+                                                          : juce::String ("CONFIRM"));
+    setVisible (true);
+    toFront (true);
+    repaint();
+}
+
+juce::Rectangle<float> PRA32ConfirmOverlay::plateBounds() const
+{
+    if (getWidth() <= 0 || getHeight() <= 0)
+        return getLocalBounds().toFloat();
+
+    const float w = juce::jmin (sc (480.0f), (float) getWidth() - sc (40.0f));
+    const float h = juce::jmin (sc (196.0f), (float) getHeight() - sc (40.0f));
+    return getLocalBounds().toFloat().withSizeKeepingCentre (w, h);
+}
+
+void PRA32ConfirmOverlay::paint (juce::Graphics& g)
+{
+    g.fillAll (juce::Colours::black.withAlpha (0.6f));
+
+    auto plate = plateBounds();
+    drawRaisedPlate (g, plate, radiusMedium);
+    drawScrewsInCorners (g, plate, sc (9.0f), sc (3.0f));
+
+    auto inner = plate.reduced (sc (26.0f), sc (20.0f));
+    auto titleArea = inner.removeFromTop (sc (22.0f));
+    drawEngravedText (g, title, titleArea, moduleFont(), juce::Justification::centredLeft,
+                      amber, engraveShadow.withAlpha (0.8f));
+
+    inner.removeFromTop (sc (10.0f));
+    inner.removeFromBottom (sc (42.0f)); // button row
+
+    g.setFont (labelFont());
+    g.setColour (textPrimary);
+    g.drawFittedText (message, inner.toNearestInt(), juce::Justification::topLeft, 4);
+}
+
+void PRA32ConfirmOverlay::resized()
+{
+    auto inner = plateBounds().reduced (sc (26.0f), sc (20.0f));
+    auto row = inner.removeFromBottom (sc (30.0f));
+
+    auto confirmArea = row.removeFromRight (sc (112.0f));
+    row.removeFromRight (sc (10.0f));
+    auto cancelArea = row.removeFromRight (sc (112.0f));
+
+    confirmButton.setBounds (confirmArea.toNearestInt());
+    cancelButton.setBounds (cancelArea.toNearestInt());
 }

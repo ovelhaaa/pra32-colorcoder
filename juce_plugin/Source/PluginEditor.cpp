@@ -412,16 +412,30 @@ PRA32ColorcoderAudioProcessorEditor::PRA32ColorcoderAudioProcessorEditor (
 
     loadButton.onClick = [this] ()
     {
-        fileChooser = std::make_unique<juce::FileChooser> (
-            "Load Preset", juce::File::getSpecialLocation (juce::File::userDocumentsDirectory), "*.json");
-        const auto flags = juce::FileBrowserComponent::openMode
-                         | juce::FileBrowserComponent::canSelectFiles;
-        fileChooser->launchAsync (flags, [this] (const juce::FileChooser& fc)
+        requestConfirmation ("LOAD PATCH FROM JSON",
+                             "Loading a JSON patch replaces the current patch. Continue?",
+                             "LOAD",
+                             [this] ()
         {
-            auto file = fc.getResult();
-            if (file.existsAsFile())
-                audioProcessor.loadPresetFromJson (file.loadFileAsString());
+            fileChooser = std::make_unique<juce::FileChooser> (
+                "Load Preset", juce::File::getSpecialLocation (juce::File::userDocumentsDirectory), "*.json");
+            const auto flags = juce::FileBrowserComponent::openMode
+                             | juce::FileBrowserComponent::canSelectFiles;
+            fileChooser->launchAsync (flags, [this] (const juce::FileChooser& fc)
+            {
+                auto file = fc.getResult();
+                if (file.existsAsFile())
+                    audioProcessor.loadPresetFromJson (file.loadFileAsString());
+            });
         });
+    };
+
+    initButton.onClick = [this] ()
+    {
+        requestConfirmation ("INITIALISE PATCH",
+                             "This replaces the current patch with the INITIALIZATION preset. Continue?",
+                             "INIT",
+                             [this] () { loadPreset (0); });
     };
 
     saveButton.onClick = [this] ()
@@ -482,12 +496,16 @@ PRA32ColorcoderAudioProcessorEditor::PRA32ColorcoderAudioProcessorEditor (
     addAndMakeVisible (presetPrevButton);
     addAndMakeVisible (presetNextButton);
     addAndMakeVisible (presetDisplay);
+    addAndMakeVisible (initButton);
     addAndMakeVisible (loadButton);
     addAndMakeVisible (saveButton);
     addAndMakeVisible (keyboardButton);
     addAndMakeVisible (keyboardComponent);
     addAndMakeVisible (octaveDownButton);
     addAndMakeVisible (octaveUpButton);
+    addChildComponent (confirmOverlay);
+
+    audioProcessor.getAPVTS().state.addListener (this);
 
     showPage (startSection);
     updatePresetDisplay();
@@ -499,6 +517,7 @@ PRA32ColorcoderAudioProcessorEditor::PRA32ColorcoderAudioProcessorEditor (
 
 PRA32ColorcoderAudioProcessorEditor::~PRA32ColorcoderAudioProcessorEditor()
 {
+    audioProcessor.getAPVTS().state.removeListener (this);
     audioProcessor.removeChangeListener (this);
     setLookAndFeel (nullptr);
 }
@@ -508,6 +527,26 @@ void PRA32ColorcoderAudioProcessorEditor::changeListenerCallback (juce::ChangeBr
 {
     updatePresetDisplay();
     repaint();
+}
+
+void PRA32ColorcoderAudioProcessorEditor::valueTreePropertyChanged (juce::ValueTree&,
+                                                                    const juce::Identifier&)
+{
+    const bool edited = audioProcessor.isCurrentPatchEdited();
+
+    if (edited != lastEdited)
+    {
+        lastEdited = edited;
+        presetDisplay.setModified (edited);
+    }
+}
+
+void PRA32ColorcoderAudioProcessorEditor::requestConfirmation (
+        const juce::String& title, const juce::String& message,
+        const juce::String& confirmText, std::function<void()> action)
+{
+    confirmOverlay.setBounds (getLocalBounds());
+    confirmOverlay.ask (title, message, confirmText, std::move (action));
 }
 
 void PRA32ColorcoderAudioProcessorEditor::storeUiState()
@@ -551,6 +590,10 @@ void PRA32ColorcoderAudioProcessorEditor::updatePresetDisplay()
         presetDisplay.setText ("--  USER / SESSION", "LOADED PATCH");
 
     presetDisplay.setPrimaryFont (presetFont());
+
+    const bool edited = audioProcessor.isCurrentPatchEdited();
+    lastEdited = edited;
+    presetDisplay.setModified (edited);
 }
 
 void PRA32ColorcoderAudioProcessorEditor::showPresetMenu()
@@ -650,14 +693,16 @@ void PRA32ColorcoderAudioProcessorEditor::resized()
     auto header = r.removeFromTop (headerHeight).reduced (margin, juce::roundToInt (sc (9.0f)));
 
     const bool compact = getWidth() < 860;
-    const int utilityW = juce::roundToInt (sc (compact ? 76.0f : 96.0f));
+    const int utilityW = juce::roundToInt (sc (compact ? 70.0f : 88.0f));
     const int keysW    = juce::roundToInt (sc (56.0f));
-    auto utility = header.removeFromRight (utilityW * 2 + keysW + gap * 2);
+    auto utility = header.removeFromRight (utilityW * 3 + keysW + gap * 3);
+    keyboardButton.setBounds (utility.removeFromRight (keysW));
+    utility.removeFromRight (gap);
     saveButton.setBounds (utility.removeFromRight (utilityW));
     utility.removeFromRight (gap);
     loadButton.setBounds (utility.removeFromRight (utilityW));
     utility.removeFromRight (gap);
-    keyboardButton.setBounds (utility.removeFromRight (keysW));
+    initButton.setBounds (utility.removeFromRight (utilityW));
 
     const int presetGroupW = juce::jmin (juce::roundToInt (sc (400.0f)), header.getWidth() - gap * 4);
     auto presetGroup = header.withSizeKeepingCentre (presetGroupW, header.getHeight());
@@ -716,4 +761,7 @@ void PRA32ColorcoderAudioProcessorEditor::resized()
 
     for (auto* page : pages)
         page->setBounds (pageArea);
+
+    // ---- Confirmation overlay ----------------------------------------------
+    confirmOverlay.setBounds (getLocalBounds());
 }

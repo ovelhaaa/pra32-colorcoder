@@ -1,5 +1,7 @@
 #include "PluginProcessor.h"
 
+#include <cmath>
+
 // -----------------------------------------------------------------------------
 // DUMMY HEADERS / WRAPPER DEFINITIONS FOR THE EMBEDDED ENGINE
 // -----------------------------------------------------------------------------
@@ -112,6 +114,30 @@ void PRA32ColorcoderAudioProcessor::setUiProperty (const juce::Identifier& key,
     apvts.state.setProperty (key, value, nullptr);
 }
 
+void PRA32ColorcoderAudioProcessor::capturePatchBaseline()
+{
+    patchBaseline.clear();
+
+    for (const auto& p : SynthParameters::getParameters())
+        if (auto* value = apvts.getRawParameterValue (p.id))
+            patchBaseline.push_back ((int) std::lround (value->load()));
+}
+
+bool PRA32ColorcoderAudioProcessor::isCurrentPatchEdited() const
+{
+    const auto& params = SynthParameters::getParameters();
+
+    if (patchBaseline.size() != params.size())
+        return false;
+
+    for (size_t i = 0; i < params.size(); ++i)
+        if (auto* value = apvts.getRawParameterValue (params[i].id))
+            if ((int) std::lround (value->load()) != patchBaseline[i])
+                return true;
+
+    return false;
+}
+
 //==============================================================================
 PRA32ColorcoderAudioProcessor::PRA32ColorcoderAudioProcessor()
      : AudioProcessor (BusesProperties()
@@ -135,6 +161,8 @@ PRA32ColorcoderAudioProcessor::PRA32ColorcoderAudioProcessor()
         pb.lastValue = -1.0f; // Force update on first block
         paramBindings.push_back(pb);
     }
+
+    capturePatchBaseline();
 }
 
 PRA32ColorcoderAudioProcessor::~PRA32ColorcoderAudioProcessor()
@@ -256,6 +284,7 @@ void PRA32ColorcoderAudioProcessor::loadPreset(int index)
         }
     }
 
+    capturePatchBaseline();
     currentFactoryPreset = juce::jlimit (0, 15, index);
     setUiProperty ("uiPreset", currentFactoryPreset);
     sendChangeMessage();
@@ -306,6 +335,7 @@ void PRA32ColorcoderAudioProcessor::loadPresetFromJson(const juce::String& jsonS
         }
     }
 
+    capturePatchBaseline();
     currentFactoryPreset = -1;
     setUiProperty ("uiPreset", -1);
     sendChangeMessage();
@@ -469,6 +499,7 @@ void PRA32ColorcoderAudioProcessor::setStateInformation (const void* data, int s
         if (xmlState->hasTagName (apvts.state.getType()))
         {
             apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
+            capturePatchBaseline();
 
             const auto presetVar = getUiProperty ("uiPreset");
             currentFactoryPreset = presetVar.isVoid() ? -1 : (int) presetVar;

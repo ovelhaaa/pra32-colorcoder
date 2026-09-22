@@ -213,6 +213,7 @@ public:
     void setJustification (juce::Justification j) { justification = j; repaint(); }
     void setPrimaryFont (juce::Font f) { primaryFont = std::move (f); repaint(); }
     void setColours (juce::Colour primary, juce::Colour secondary);
+    void setModified (bool shouldShowModifiedBadge);
 
     std::function<void()> onClick;
 
@@ -225,6 +226,32 @@ private:
     juce::Font primaryFont { PRA32Theme::presetFont() };
     juce::Colour primaryColour { PRA32Theme::amber };
     juce::Colour secondaryColour { PRA32Theme::textDim };
+    bool modified = false;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ValueReadout)
+};
+
+// -----------------------------------------------------------------------------
+// Themed modal confirmation. Covers the editor with a dimmed backdrop and a
+// rack plate, so destructive actions require an explicit, focused choice.
+class PRA32ConfirmOverlay : public juce::Component
+{
+public:
+    PRA32ConfirmOverlay();
+
+    void ask (const juce::String& title, const juce::String& message,
+              const juce::String& confirmText, std::function<void()> onConfirm);
+
+    void paint (juce::Graphics&) override;
+    void resized() override;
+
+private:
+    juce::Rectangle<float> plateBounds() const;
+
+    juce::TextButton confirmButton { "CONFIRM" };
+    juce::TextButton cancelButton  { "CANCEL" };
+    juce::String title, message;
+    std::function<void()> callback;
+
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PRA32ConfirmOverlay)
 };

@@ -63,6 +63,9 @@ public:
     // -1 when the current patch came from a JSON file / host session.
     int getCurrentFactoryPreset() const noexcept { return currentFactoryPreset; }
 
+    // True when any parameter differs from the patch captured at load time.
+    bool isCurrentPatchEdited() const;
+
     // Small non-parameter UI state persisted with the plugin state.
     juce::var getUiProperty (const juce::Identifier& key) const;
     void setUiProperty (const juce::Identifier& key, const juce::var& value);
@@ -83,6 +86,8 @@ private:
     std::vector<ParamBinding> paramBindings;
 
     int currentFactoryPreset = 0;
+    std::vector<int> patchBaseline;
+    void capturePatchBaseline();
 
     // Resampling state for the 48kHz engine
     double currentPhase = 0.0;
