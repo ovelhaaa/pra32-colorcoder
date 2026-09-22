@@ -51,7 +51,7 @@ struct SynthParamData {
     int min;
     int max;
     int def;
-    juce::String section;    // OSC / FILTER / ENVS / MOD / FX / COLOR
+    juce::String section;    // OSC / FILTER / ENVS / MOD / FX / CHARACTER
     juce::String subsection; // module inside the page
     PRA32ControlKind kind;
     bool bipolar;

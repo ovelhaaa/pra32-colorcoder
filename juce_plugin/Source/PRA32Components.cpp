@@ -316,7 +316,7 @@ void SteppedSelector::selectFromPoint (juce::Point<int> position)
     const int n = bandCount (param.enumLabels);
     auto r = getLocalBounds().toFloat();
     r.removeFromTop (sc (12.0f));
-    r.removeFromBottom (sc (13.0f));
+    r.removeFromBottom (sc (3.0f));
     auto inner = r.reduced (1.0f, 2.0f).reduced (sc (2.0f));
 
     const int cols = gridColumnsFor (n);
@@ -341,7 +341,7 @@ void SteppedSelector::paint (juce::Graphics& g)
 {
     auto r = getLocalBounds().toFloat();
     auto nameArea = r.removeFromTop (sc (12.0f));
-    auto valueArea = r.removeFromBottom (sc (13.0f));
+    r.removeFromBottom (sc (3.0f));
 
     const auto accent = sectionAccent (param.section);
     const int n = bandCount (param.enumLabels);
@@ -394,7 +394,7 @@ void SteppedSelector::paint (juce::Graphics& g)
         g.setFont (valueFont());
         g.setColour (on ? juce::Colours::black : (isEnabled() ? textPrimary : textDim));
         g.drawFittedText (label.toUpperCase(), seg.reduced (sc (2.0f)).toNearestInt(),
-                          juce::Justification::centred, 1, 0.5f);
+                          juce::Justification::centred, 1, 0.65f);
     }
 
     drawEngravedText (g, uppercase (param.displayName), nameArea,
@@ -406,8 +406,6 @@ void SteppedSelector::paint (juce::Graphics& g)
         g.setColour (accent.withAlpha (0.7f));
         g.drawRoundedRectangle (getLocalBounds().toFloat().reduced (1.0f), radiusSmall, 1.2f);
     }
-
-    juce::ignoreUnused (valueArea);
 }
 
 //==============================================================================
@@ -586,7 +584,7 @@ void ModulePanel::resized()
 //==============================================================================
 SectionSelector::SectionSelector()
 {
-    setSections ({ "OSC", "FILTER", "ENVS", "MOD", "FX", "COLOR" });
+    setSections ({ "OSC", "FILTER", "ENVS", "MOD", "FX", "CHARACTER" });
 }
 
 void SectionSelector::setSections (const juce::StringArray& names)

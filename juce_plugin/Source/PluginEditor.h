@@ -33,7 +33,7 @@ private:
     void buildEnvs();
     void buildMod();
     void buildFx();
-    void buildColor();
+    void buildCharacter();
 
     void layoutStack (juce::Rectangle<int> area, int gap);
     void layoutOsc (juce::Rectangle<int> area);
@@ -41,7 +41,7 @@ private:
     void layoutEnvs (juce::Rectangle<int> area);
     void layoutMod (juce::Rectangle<int> area);
     void layoutFx (juce::Rectangle<int> area);
-    void layoutColor (juce::Rectangle<int> area);
+    void layoutCharacter (juce::Rectangle<int> area);
 
     PRA32ColorcoderAudioProcessor& processor;
     juce::String section;

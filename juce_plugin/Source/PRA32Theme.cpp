@@ -7,18 +7,24 @@ namespace PRA32Theme
 
 juce::Colour sectionAccent (const juce::String& section)
 {
-    if (section == "OSC")    return juce::Colour (0xffd99a3f); // amber
-    if (section == "FILTER") return juce::Colour (0xff5eb7b0); // cyan / teal
-    if (section == "ENVS")   return juce::Colour (0xffa8b56a); // olive
-    if (section == "MOD")    return juce::Colour (0xff7f9fd0); // steel blue
-    if (section == "FX")     return juce::Colour (0xffc98b6a); // copper
-    if (section == "COLOR")  return juce::Colour (0xffb07fb0); // mauve
+    if (section == "OSC")       return juce::Colour (0xffd99a3f); // amber
+    if (section == "FILTER")    return juce::Colour (0xff5eb7b0); // cyan / teal
+    if (section == "ENVS")      return juce::Colour (0xffa8b56a); // olive
+    if (section == "MOD")       return juce::Colour (0xff7f9fd0); // steel blue
+    if (section == "FX")        return juce::Colour (0xffc98b6a); // copper
+    if (section == "CHARACTER"
+     || section == "COLOR")     return juce::Colour (0xffb07fb0); // mauve
     return amber;
 }
 
 juce::Font brandFont()
 {
     return juce::Font (juce::FontOptions (20.0f).withStyle ("Bold"));
+}
+
+juce::Font subBrandFont()
+{
+    return juce::Font (juce::FontOptions (8.5f).withStyle ("Bold"));
 }
 
 juce::Font moduleFont()

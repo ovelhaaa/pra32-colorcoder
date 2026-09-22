@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate SVG screen mockups for the PRA32 Colorcoder VST redesign.
+"""Generate SVG screen mockups for the Tonecoder TC-32 VST.
 
 The geometry and palette mirror juce_plugin/Source/PRA32Theme.h so the mocks
 and the implementation stay aligned. Run:
@@ -35,7 +35,7 @@ MAUVE        = "#b07fb0"
 RED          = "#b84b40"
 
 ACCENT = {"OSC": AMBER, "FILTER": CYAN, "ENVS": OLIVE,
-          "MOD": BLUE, "FX": COPPER, "COLOR": MAUVE}
+          "MOD": BLUE, "FX": COPPER, "CHARACTER": MAUVE, "COLOR": MAUVE}
 
 OSC1_WAVES  = ["SAW", "SQR", "TRI", "SIN", "WT", "PLS"]
 OSC2_WAVES  = ["SAW", "SQR", "TRI", "SIN", "OSC 1", "NOISE"]
@@ -276,22 +276,30 @@ def header(active):
     out = [rect(0, 0, W, 54, PANEL)]
     out.append(line(0, 54, W, 54, "#000000", 1, opacity=0.5))
     out.append(line(0, 55, W, 55, "#ffffff", 1, opacity=0.04))
-    out.append(txt(16, 26, "PRA32", 20, TEXT, anchor="start", weight="700"))
-    out.append(txt(16, 42, "C O L O R C O D E R", 9, AMBER, anchor="start", spacing=1.5))
+
+    # indicator lamp
+    out.append(rect(18, 22, 10, 10, "#0a0c0e", rx=2, stroke="#000000"))
+    out.append(circle(23, 27, 3.2, AMBER_HI, opacity=0.85))
+
+    # model and brand
+    out.append(txt(36, 26, "TC-32", 15, AMBER_HI, anchor="start", weight="700"))
+    out.append(circle(86, 21, 1.4, TEXT_DIM))
+    out.append(txt(94, 26, "T O N E C O D E R", 15, TEXT, anchor="start", weight="700", spacing=1.2))
+    out.append(txt(36, 42, "FOUR-VOICE POLYPHONIC SIGNAL SYNTHESIZER", 8.0, TEXT2, anchor="start", weight="600", spacing=0.6))
 
     # preset browser
-    cx = W / 2
-    out.append(rect(cx - 200, 12, 400, 30, PANEL_SUNKEN, rx=3, stroke=BORDER))
-    out.append(txt(cx - 174, 32, "\u2039", 16, TEXT2, anchor="middle"))
-    out.append(txt(cx + 174, 32, "\u203a", 16, TEXT2, anchor="middle"))
-    out.append(txt(cx, 27, "08  ETHEREAL PAD", 14, TEXT, font=MONO, weight="bold"))
-    out.append(txt(cx, 39, "FACTORY PRESET", 8, TEXT_DIM, spacing=1.2))
+    cx = W / 2 + 10
+    out.append(rect(cx - 160, 12, 320, 30, PANEL_SUNKEN, rx=3, stroke=BORDER))
+    out.append(txt(cx - 140, 32, "\u2039", 16, TEXT2, anchor="middle"))
+    out.append(txt(cx + 140, 32, "\u203a", 16, TEXT2, anchor="middle"))
+    out.append(txt(cx, 27, "08  ETHEREAL PAD", 13, TEXT, font=MONO, weight="bold"))
+    out.append(txt(cx, 39, "PROGRAM / FACTORY", 7.5, TEXT_DIM, spacing=1.2))
 
-    for bx, label in ((W - 300, "LOAD JSON"), (W - 200, "SAVE JSON")):
-        out.append(rect(bx, 14, 92, 26, PANEL_RAISED, rx=3, stroke=BORDER))
-        out.append(txt(bx + 46, 31, label, 9, TEXT2))
-    out.append(rect(W - 96, 14, 56, 26, PANEL_RAISED, rx=3, stroke=ACCENT[active]))
-    out.append(txt(W - 68, 31, "KEYS", 9, ACCENT[active]))
+    for bx, label, bw in ((W - 326, "INIT", 62), (W - 256, "LOAD JSON", 76), (W - 172, "SAVE JSON", 76)):
+        out.append(rect(bx, 14, bw, 26, PANEL_RAISED, rx=3, stroke=BORDER))
+        out.append(txt(bx + bw / 2, 31, label, 8.5, TEXT2))
+    out.append(rect(W - 88, 14, 52, 26, PANEL_RAISED, rx=3, stroke=ACCENT[active]))
+    out.append(txt(W - 62, 31, "KEYS", 8.5, ACCENT[active]))
 
     return "".join(out)
 
@@ -313,7 +321,7 @@ def section_bar(active):
     x0, y0, h = 12, 62, 32
     n = 6
     seg = (W - 24) / n
-    for i, name in enumerate(["OSC", "FILTER", "ENVS", "MOD", "FX", "COLOR"]):
+    for i, name in enumerate(["OSC", "FILTER", "ENVS", "MOD", "FX", "CHARACTER"]):
         x = x0 + i * seg
         on = (name == active)
         acc = ACCENT[name]
@@ -347,16 +355,27 @@ def keyboard():
     out.append(circle(x0 + w - 20, y0 + 14, 3.5, AMBER, opacity=0.85))
 
     kx, ky, kw_all, kh = x0 + 10, y0 + 24, w - 20, h - 30
-    keys = 24
+    keys = 36  # 5 full octaves (C2 to C7)
     kw = kw_all / keys
+    bkw = kw * 0.60
+    bkh = kh * 0.62
+
+    # Draw all white keys
     for i in range(keys):
         x = kx + i * kw
         out.append(rect(x + 0.5, ky, kw - 1, kh, "#e9e5da", rx=1.5,
                         stroke="#3a3e42", sw=0.6))
-    for i in [0, 1, 3, 4, 5, 7, 8, 10, 11, 12]:
-        x = kx + i * kw + kw * 0.66
-        out.append(rect(x, ky, kw * 0.62, kh * 0.6, "#14161a", rx=1.5,
-                        stroke="#000000", sw=0.6))
+        if i % 7 == 0:
+            oct_num = 2 + i // 7
+            out.append(txt(x + kw / 2, ky + kh - 4, f"C{oct_num}", 6.8, "#6b665c", font=MONO))
+
+    # Draw all black keys across the entire keyboard extent
+    for i in range(keys - 1):
+        if (i % 7) in (0, 1, 3, 4, 5):
+            bx_key = kx + (i + 1) * kw - bkw * 0.5
+            out.append(rect(bx_key, ky, bkw, bkh, "#14161a", rx=1.5,
+                            stroke="#000000", sw=0.6))
+            out.append(line(bx_key + 1.5, ky + 1.5, bx_key + bkw - 1.5, ky + 1.5, "#ffffff", 1, opacity=0.15))
     return "".join(out)
 
 
@@ -411,34 +430,36 @@ def end(show_keyboard=True):
 # --- page content ------------------------------------------------------------
 def page_osc():
     s = start("OSC")
-    s += module(12, 102, 936, 128, "Oscillator 1", "", AMBER)
-    s += pushbank(60, 150, 120, 52, "WAVE", OSC1_WAVES, 0, AMBER)
-    s += knob(310, 172, 40, 0.18, "SHAPE", "18%", AMBER)
-    s += knob(500, 172, 40, 0.0, "MORPH", "SAW", AMBER)
-    s += knob(690, 172, 40, 0.10, "DRIFT", "10%", AMBER)
-    s += pushbank(812, 150, 128, 52, "SAW MODE", ["STRAIGHT", "CURVED"], 0, AMBER)
+    # OSC 1 and OSC 2 side-by-side with identical height (268px) and identical knob sizes (r=48)
+    s += module(12, 102, 456, 268, "Oscillator 1", "", AMBER)
+    s += pushbank(28, 130, 240, 85, "WAVE", OSC1_WAVES, 0, AMBER, cols=3)
+    s += pushbank(290, 130, 160, 85, "SAW MODE", ["STRAIGHT", "CURVED"], 0, AMBER, cols=1)
+    s += knob(90, 290, 48, 0.18, "SHAPE", "18%", AMBER)
+    s += knob(240, 290, 48, 0.0, "MORPH", "SAW", AMBER)
+    s += knob(380, 290, 48, 0.10, "DRIFT", "10%", AMBER)
 
-    s += module(12, 242, 456, 278, "Oscillator 2", "", AMBER)
-    s += pushbank(24, 338, 128, 52, "WAVE", OSC2_WAVES, 0, AMBER)
-    s += knob(228, 360, 48, 0.5, "COARSE", "+0 st", AMBER, bipolar=True)
-    s += knob(368, 360, 48, 0.5, "FINE", "+0 ct", AMBER, bipolar=True)
-    s += txt(240, 470, "coarse +/- 24 st   |   fine in cents", 9, TEXT_DIM, font=MONO)
+    s += module(480, 102, 468, 268, "Oscillator 2", "", AMBER)
+    s += pushbank(594, 130, 240, 85, "WAVE", OSC2_WAVES, 0, AMBER, cols=3)
+    s += knob(590, 290, 48, 0.5, "COARSE", "+0 st", AMBER, bipolar=True)
+    s += knob(830, 290, 48, 0.5, "FINE", "+0 ct", AMBER, bipolar=True)
+    s += txt(714, 350, "coarse +/- 24 st   |   fine in cents", 8.5, TEXT_DIM, font=MONO)
 
-    s += module(480, 242, 468, 278, "Mixer", "", AMBER)
-    s += knob(614, 360, 54, 0.5, "OSC 1 / OSC 2", "50 / 50", AMBER, bipolar=True)
-    s += knob(834, 360, 54, 0.5, "NOISE / SUB", "0%", AMBER, bipolar=True)
+    s += module(12, 380, 936, 140, "Mixer", "", AMBER)
+    s += knob(300, 452, 48, 0.5, "OSC 1 / OSC 2", "50 / 50", AMBER, bipolar=True)
+    s += knob(660, 452, 48, 0.5, "NOISE / SUB", "0%", AMBER, bipolar=True)
     return s + end()
 
 
 def page_filter():
     s = start("FILTER")
-    s += module(12, 102, 600, 418, "Filter", "", CYAN)
-    s += knob(200, 250, 78, 1.0, "CUTOFF", "19.9 kHz", CYAN)
-    s += knob(466, 250, 62, 0.0, "RESONANCE", "0.70 Q", CYAN)
-    s += txt(200, 362, "cutoff = 440 \u00b7 2^((v-61)/12)", 9, TEXT_DIM, font=MONO)
+    s += module(12, 102, 600, 418, "Filter Network", "", CYAN)
+    # Cutoff and Resonance with the EXACT same size (r=64)
+    s += knob(200, 230, 64, 1.0, "CUTOFF", "19.9 kHz", CYAN)
+    s += knob(466, 230, 64, 0.0, "RESONANCE", "0.70 Q", CYAN)
+    s += txt(200, 320, "cutoff = 440 \u00b7 2^((v-61)/12)", 9, TEXT_DIM, font=MONO)
 
     # response graph
-    gx, gy, gw, gh = 70, 380, 484, 120
+    gx, gy, gw, gh = 70, 360, 484, 140
     s += rect(gx, gy, gw, gh, PANEL_SUNKEN, rx=3, stroke=BORDER)
     pts = []
     for i in range(0, 101):
@@ -453,11 +474,12 @@ def page_filter():
     s += line(gx + 8, gy + gh - 12, gx + gw - 8, gy + gh - 12, SEPARATOR, 1)
     s += txt(gx + 10, gy + 14, "RESPONSE (UI)", 8, TEXT_DIM, anchor="start", spacing=0.8)
 
-    s += module(624, 102, 324, 418, "Shaping", "", CYAN)
-    s += pushbank(644, 172, 148, 52, "FILTER TYPE", ["LOW PASS", "HIGH PASS"], 0, CYAN)
-    s += knob(872, 200, 44, 0.5, "MOD AMOUNT", "+0", CYAN, bipolar=True)
-    s += knob(700, 340, 44, 0.5, "KEY TRACK", "+0.000", CYAN, bipolar=True)
-    s += knob(872, 340, 44, 0.5, "BREATH AMT", "+0", CYAN, bipolar=True)
+    s += module(624, 102, 324, 418, "Filter Shaping", "", CYAN)
+    # Low Pass and High Pass in 1 column with 2 rows (cols=1)
+    s += pushbank(644, 140, 140, 100, "FILTER TYPE", ["LOW PASS", "HIGH PASS"], 0, CYAN, cols=1)
+    s += knob(872, 190, 46, 0.5, "MOD AMOUNT", "+0", CYAN, bipolar=True)
+    s += knob(714, 320, 46, 0.5, "KEY TRACK", "+0.000", CYAN, bipolar=True)
+    s += knob(872, 320, 46, 0.5, "BREATH AMT", "+0", CYAN, bipolar=True)
     s += toggle(648, 430, 276, 30, "Release = Decay", False, CYAN)
     return s + end()
 
@@ -476,76 +498,83 @@ def adsr_curve(x, y, w, h, a=0.18, d=0.22, sus=0.65, r=0.30, accent=OLIVE):
 
 def page_envs():
     s = start("ENVS")
-    s += module(12, 102, 456, 238, "Mod Envelope", "", OLIVE)
-    s += rect(28, 126, 424, 84, PANEL_SUNKEN, rx=3, stroke=BORDER)
-    s += adsr_curve(28, 126, 424, 84)
-    s += knob(80, 268, 40, 0.0, "ATTACK", "0.7 ms", OLIVE)
-    s += knob(190, 268, 40, 0.5, "DECAY", "200 ms", OLIVE)
-    s += knob(300, 268, 40, 1.0, "SUSTAIN", "100%", OLIVE)
-    s += knob(410, 268, 40, 0.5, "RELEASE", "200 ms", OLIVE)
+    # Pitch Modulation moved to Character. Mod Envelope and Amp Envelope take full height!
+    s += module(12, 102, 456, 418, "Mod Envelope", "", OLIVE)
+    s += rect(28, 134, 424, 160, PANEL_SUNKEN, rx=3, stroke=BORDER)
+    s += adsr_curve(28, 134, 424, 160)
+    s += knob(80, 390, 48, 0.0, "ATTACK", "0.7 ms", OLIVE)
+    s += knob(190, 390, 48, 0.5, "DECAY", "200 ms", OLIVE)
+    s += knob(300, 390, 48, 1.0, "SUSTAIN", "100%", OLIVE)
+    s += knob(410, 390, 48, 0.5, "RELEASE", "200 ms", OLIVE)
 
-    s += module(480, 102, 456, 238, "Amp Envelope", "", OLIVE)
-    s += rect(496, 126, 424, 84, PANEL_SUNKEN, rx=3, stroke=BORDER)
-    s += adsr_curve(496, 126, 424, 84, 0.1, 0.3, 0.85, 0.2)
-    s += knob(548, 268, 40, 0.0, "ATTACK", "0.7 ms", OLIVE)
-    s += knob(658, 268, 40, 0.5, "DECAY", "200 ms", OLIVE)
-    s += knob(768, 268, 40, 1.0, "SUSTAIN", "100%", OLIVE)
-    s += knob(878, 268, 40, 0.5, "RELEASE", "200 ms", OLIVE)
-
-    s += module(12, 352, 924, 168, "Pitch Mod", "", OLIVE)
-    s += knob(360, 438, 46, 0.5, "PITCH MOD", "+0 ct", OLIVE, bipolar=True)
-    s += pushbank(516, 410, 176, 52, "EG DEST", MOD_DESTS, 0, OLIVE)
+    s += module(480, 102, 468, 418, "Amp Envelope", "", OLIVE)
+    s += rect(496, 134, 436, 160, PANEL_SUNKEN, rx=3, stroke=BORDER)
+    s += adsr_curve(496, 134, 436, 160, 0.1, 0.3, 0.85, 0.2)
+    s += knob(552, 390, 48, 0.0, "ATTACK", "0.7 ms", OLIVE)
+    s += knob(662, 390, 48, 0.5, "DECAY", "200 ms", OLIVE)
+    s += knob(772, 390, 48, 1.0, "SUSTAIN", "100%", OLIVE)
+    s += knob(882, 390, 48, 0.5, "RELEASE", "200 ms", OLIVE)
     return s + end()
 
 
 def page_mod():
     s = start("MOD")
-    s += module(12, 102, 660, 418, "LFO", "", BLUE)
-    s += pushbank(30, 128, 196, 148, "WAVE", LFO_WAVES, 0, BLUE, cols=3)
-    s += knob(330, 196, 46, 0.5, "RATE", "2.70 Hz", BLUE)
-    s += knob(470, 196, 46, 0.0, "FADE IN", "0 ms", BLUE)
-    s += knob(600, 196, 46, 0.0, "DEPTH", "0%", BLUE)
-    s += pushbank(30, 330, 196, 148, "LFO DEST", MOD_DESTS, 0, BLUE, cols=3)
-    s += knob(330, 398, 46, 0.5, "CUTOFF AMT", "+0", BLUE, bipolar=True)
-    s += knob(470, 398, 46, 0.5, "PITCH AMT", "+0 ct", BLUE, bipolar=True)
+    # Performance moved to Character. Modulation LFO takes full space!
+    s += module(12, 102, 936, 418, "Modulation LFO", "", BLUE)
+    s += pushbank(36, 140, 240, 140, "WAVE", LFO_WAVES, 0, BLUE, cols=3)
+    s += knob(380, 210, 52, 0.5, "RATE", "2.70 Hz", BLUE)
+    s += knob(570, 210, 52, 0.0, "FADE IN", "0 ms", BLUE)
+    s += knob(760, 210, 52, 0.0, "DEPTH", "0%", BLUE)
 
-    s += module(684, 102, 264, 418, "Performance", "", BLUE)
-    s += knob(816, 240, 48, 0.02, "BEND RANGE", "2 st", BLUE)
-    s += knob(816, 400, 48, 0.0, "GLIDE TIME", "0 ms", BLUE)
+    s += pushbank(36, 310, 240, 140, "LFO DEST", MOD_DESTS, 0, BLUE, cols=3)
+    s += knob(460, 390, 52, 0.5, "CUTOFF AMT", "+0", BLUE, bipolar=True)
+    s += knob(680, 390, 52, 0.5, "PITCH AMT", "+0 ct", BLUE, bipolar=True)
+    s += txt(820, 390, "modulates cutoff & pitch", 9.5, TEXT_DIM, font=MONO)
     return s + end()
 
 
 def page_fx():
     s = start("FX")
-    s += module(12, 102, 288, 418, "Chorus", "", COPPER)
-    s += knob(156, 190, 46, 1.0, "LEVEL", "100%", COPPER)
-    s += knob(156, 330, 46, 0.0, "RATE", "0.01 Hz", COPPER)
-    s += knob(156, 460, 42, 0.0, "DEPTH", "+0.0 ms", COPPER)
+    # Output moved to Character. Chorus and Delay share full space!
+    s += module(12, 102, 340, 418, "Chorus", "", COPPER)
+    s += knob(182, 180, 48, 1.0, "LEVEL", "100%", COPPER)
+    s += knob(182, 300, 48, 0.0, "RATE", "0.01 Hz", COPPER)
+    s += knob(182, 420, 48, 0.0, "DEPTH", "+0.0 ms", COPPER)
 
-    s += module(312, 102, 396, 418, "Delay", "", COPPER)
-    s += knob(510, 195, 58, 0.5, "TIME", "173.3 ms", COPPER)
-    s += pushbank(430, 306, 160, 52, "MODE", ["STEREO", "PING PONG"], 0, COPPER)
-    s += knob(420, 460, 40, 0.0, "LEVEL", "0%", COPPER)
-    s += knob(600, 460, 40, 0.5, "FEEDBACK", "25%", COPPER)
-
-    s += module(720, 102, 228, 418, "Output", "", COPPER)
-    s += knob(834, 210, 46, 0.5, "PAN", "CENTER", COPPER, bipolar=True)
-    s += knob(834, 360, 46, 0.5, "AMP GAIN", "-11.9 dB", COPPER)
-    s += toggle(744, 450, 180, 30, "EG Amp Mod", False, COPPER)
+    s += module(364, 102, 584, 418, "Delay", "", COPPER)
+    s += knob(510, 210, 56, 0.5, "TIME", "173.3 ms", COPPER)
+    s += pushbank(670, 180, 230, 60, "MODE", ["STEREO", "PING PONG"], 0, COPPER, cols=2)
+    s += knob(510, 370, 50, 0.0, "LEVEL", "0%", COPPER)
+    s += knob(770, 370, 50, 0.5, "FEEDBACK", "25%", COPPER)
     return s + end()
 
 
-def page_color():
-    s = start("COLOR")
-    s += module(12, 102, 456, 418, "Voice", "", MAUVE)
-    s += pushbank(24, 214, 192, 52, "VOICE MODE", VOICE_MODES, 0, MAUVE)
-    s += pushbank(240, 214, 168, 52, "VOICE ASSIGN", ["MODE 1", "MODE 2"], 0, MAUVE)
-    s += pushbank(168, 396, 176, 52, "BREATH AMP", ["OFF", "QUAD", "LIN"], 0, MAUVE)
+def page_character():
+    s = start("CHARACTER")
+    # Row 1: Voice (544w) & Voice Character (380w)
+    s += module(12, 102, 544, 204, "Voice", "", MAUVE)
+    s += pushbank(28, 134, 230, 156, "VOICE MODE", VOICE_MODES, 0, MAUVE, cols=3)
+    s += pushbank(272, 134, 120, 156, "VOICE ASSIGN", ["MODE 1", "MODE 2"], 0, MAUVE, cols=1)
+    s += pushbank(404, 134, 136, 156, "BREATH AMP", ["OFF", "QUAD", "LIN"], 0, MAUVE, cols=1)
 
-    s += module(480, 102, 456, 418, "Character", "", MAUVE)
-    s += knob(600, 240, 50, 0.0, "MOD VEL", "0%", MAUVE)
-    s += knob(816, 240, 50, 0.0, "AMP VEL", "0%", MAUVE)
-    s += knob(708, 420, 50, 0.0, "AT LFO AMT", "0%", MAUVE)
+    s += module(568, 102, 380, 204, "Voice Character", "", MAUVE)
+    s += knob(630, 215, 48, 0.0, "MOD VEL", "0%", MAUVE)
+    s += knob(758, 215, 48, 0.0, "AMP VEL", "0%", MAUVE)
+    s += knob(886, 215, 48, 0.0, "AT LFO AMT", "0%", MAUVE)
+
+    # Row 2: Performance (270w), Pitch Modulation (370w), Output (276w)
+    s += module(12, 316, 270, 204, "Performance", "", MAUVE)
+    s += knob(78, 428, 48, 0.02, "BEND RANGE", "2 st", MAUVE)
+    s += knob(214, 428, 48, 0.0, "GLIDE TIME", "0 ms", MAUVE)
+
+    s += module(292, 316, 370, 204, "Pitch Modulation", "", MAUVE)
+    s += knob(364, 428, 48, 0.5, "PITCH MOD", "+0 ct", MAUVE, bipolar=True)
+    s += pushbank(454, 348, 194, 156, "EG DEST", MOD_DESTS, 0, MAUVE, cols=3)
+
+    s += module(672, 316, 276, 204, "Output", "", MAUVE)
+    s += knob(740, 395, 44, 0.5, "PAN", "CENTER", MAUVE, bipolar=True)
+    s += knob(876, 395, 44, 0.5, "AMP GAIN", "-11.9 dB", MAUVE)
+    s += toggle(700, 465, 220, 28, "EG Amp Mod", False, MAUVE)
     return s + end()
 
 
@@ -555,7 +584,7 @@ PAGES = {
     "envs": page_envs,
     "mod": page_mod,
     "fx": page_fx,
-    "color": page_color,
+    "character": page_character,
 }
 
 

@@ -19,6 +19,15 @@
 ![PRA32-U2 (Pico Audio Pack)](./pra32-u2-pico-audio-pack.jpg)
 
 
+## Tonecoder TC-32 (VST3 / Standalone Plugin)
+
+This repository includes **Tonecoder TC-32**, a virtual instrument plug-in (VST3 and Standalone) powered by the PRA32-U2 synthesis engine.
+
+Featuring a dedicated control panel inspired by 1960–1980s laboratory instrumentation, broadcast consoles, and vintage signal processors, the TC-32 provides 4-voice polyphony, dual oscillators with morph and shape controls, resonant filter network, dual envelopes, modulation LFO, stereo chorus, delay, and rich voice character/expression controls.
+
+See [`juce_plugin/README.md`](juce_plugin/README.md) for documentation and build instructions.
+
+
 ## [Change History](./PRA32-U2-Change-History.md)
 
 

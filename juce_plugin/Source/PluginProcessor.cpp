@@ -188,7 +188,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout PRA32ColorcoderAudioProcesso
 //==============================================================================
 const juce::String PRA32ColorcoderAudioProcessor::getName() const
 {
+   #ifdef JucePlugin_Name
     return JucePlugin_Name;
+   #else
+    return "Tonecoder TC-32";
+   #endif
 }
 
 bool PRA32ColorcoderAudioProcessor::acceptsMidi() const

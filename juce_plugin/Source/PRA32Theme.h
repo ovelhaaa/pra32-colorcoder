@@ -2,7 +2,7 @@
 
 #include <JuceHeader.h>
 
-// Centralised visual tokens for the PRA32 Colorcoder panel. Every colour,
+// Centralised visual tokens for the Tonecoder TC-32 panel. Every colour,
 // metric and font used by the UI lives here so paint() code stays free of
 // magic numbers. Nothing here affects the DSP or parameter values.
 namespace PRA32Theme
@@ -81,6 +81,7 @@ namespace PRA32Theme
     // Typography
     // -------------------------------------------------------------------------
     juce::Font brandFont();
+    juce::Font subBrandFont();
     juce::Font moduleFont();
     juce::Font sectionFont();
     juce::Font labelFont();

@@ -6,7 +6,7 @@ using namespace PRA32Theme;
 
 namespace {
 
-const char* const kSections[6] = { "OSC", "FILTER", "ENVS", "MOD", "FX", "COLOR" };
+const char* const kSections[6] = { "OSC", "FILTER", "ENVS", "MOD", "FX", "CHARACTER" };
 
 const juce::Identifier uiSectionProperty  { "uiSection" };
 const juce::Identifier uiKeyboardProperty { "uiKeyboard" };
@@ -19,13 +19,14 @@ PRA32ParameterPage::PRA32ParameterPage (PRA32ColorcoderAudioProcessor& p,
                                         juce::String sectionName)
     : processor (p), section (std::move (sectionName))
 {
-    if (section == "OSC")         buildOsc();
-    else if (section == "FILTER") buildFilter();
-    else if (section == "ENVS")   buildEnvs();
-    else if (section == "MOD")    buildMod();
-    else if (section == "FX")     buildFx();
-    else if (section == "COLOR")  buildColor();
-    else                          buildGeneric();
+    if (section == "OSC")              buildOsc();
+    else if (section == "FILTER")      buildFilter();
+    else if (section == "ENVS")        buildEnvs();
+    else if (section == "MOD")         buildMod();
+    else if (section == "FX")          buildFx();
+    else if (section == "CHARACTER"
+          || section == "COLOR")       buildCharacter();
+    else                               buildGeneric();
 }
 
 //==============================================================================
@@ -124,22 +125,29 @@ void PRA32ParameterPage::buildGeneric()
 void PRA32ParameterPage::buildOsc()
 {
     auto& osc1 = *addModule ("OSCILLATOR 1");
-    addToPanel (osc1, { "osc1Wave", "osc1Shape", "osc1Morph", "oscDrift", "sawWMode" });
-    osc1.setPreferredColumns (5);
-    osc1.setHeroLayout (true);
+    osc1.setAutoLayout (false);
+    addToPanel (osc1, { "osc1Wave", "sawWMode", "osc1Shape", "osc1Morph", "oscDrift" });
+
+    if (auto* selector = dynamic_cast<SteppedSelector*> (find ("osc1Wave")))
+        selector->setGridColumns (3);
+    if (auto* selector = dynamic_cast<SteppedSelector*> (find ("sawWMode")))
+        selector->setGridColumns (1);
 
     auto& osc2 = *addModule ("OSCILLATOR 2");
+    osc2.setAutoLayout (false);
     addToPanel (osc2, { "osc2Wave", "osc2Coarse", "osc2Pitch" });
-    osc2.setPreferredColumns (3);
+
+    if (auto* selector = dynamic_cast<SteppedSelector*> (find ("osc2Wave")))
+        selector->setGridColumns (3);
 
     auto& mixer = *addModule ("MIXER");
+    mixer.setAutoLayout (false);
     addToPanel (mixer, { "oscMix", "subOsc" });
-    mixer.setPreferredColumns (2);
 }
 
 void PRA32ParameterPage::buildFilter()
 {
-    auto& filter = *addModule ("FILTER");
+    auto& filter = *addModule ("FILTER NETWORK");
     filter.setAutoLayout (false);
     addParam ("filterCutoff");
     addParam ("filterReso");
@@ -148,9 +156,12 @@ void PRA32ParameterPage::buildFilter()
                                                        sectionAccent (section)));
     filter.addControl (*graph);
 
-    auto& shaping = *addModule ("SHAPING");
+    auto& shaping = *addModule ("FILTER SHAPING");
+    shaping.setAutoLayout (false);
     addToPanel (shaping, { "filterMode", "egFltAmt", "filterKeyTrk", "bthFltAmt", "relEqDcy" });
-    shaping.setPreferredColumns (2);
+
+    if (auto* selector = dynamic_cast<SteppedSelector*> (find ("filterMode")))
+        selector->setGridColumns (1);
 }
 
 void PRA32ParameterPage::buildEnvs()
@@ -172,32 +183,20 @@ void PRA32ParameterPage::buildEnvs()
 
     makeEnvelope ("MOD ENVELOPE", "egAttack", "egDecay", "egSustain", "egRelease");
     makeEnvelope ("AMP ENVELOPE", "ampAttack", "ampDecay", "ampSustain", "ampRelease");
-
-    auto& pitch = *addModule ("PITCH MOD");
-    addToPanel (pitch, { "egOscAmt", "egOscDst" });
-    pitch.setPreferredColumns (2);
 }
 
 void PRA32ParameterPage::buildMod()
 {
-    auto& lfo = *addModule ("LFO");
+    auto& lfo = *addModule ("MODULATION LFO");
+    lfo.setAutoLayout (false);
     addToPanel (lfo, { "lfoWave", "lfoRate", "lfoFadeTime", "lfoDepth",
-                       "lfoFltAmt", "lfoOscAmt", "lfoOscDst" });
-    lfo.setPreferredColumns (3);
+                       "lfoOscDst", "lfoFltAmt", "lfoOscAmt" });
 
-    // The two six-position selectors read as interlocked banks of 3 columns
-    // by 2 rows rather than a single long strip.
     if (auto* selector = dynamic_cast<SteppedSelector*> (find ("lfoWave")))
         selector->setGridColumns (3);
 
     if (auto* selector = dynamic_cast<SteppedSelector*> (find ("lfoOscDst")))
         selector->setGridColumns (3);
-
-    lfo.setHeroLayout (true);
-
-    auto& perf = *addModule ("PERFORMANCE");
-    addToPanel (perf, { "pbRange", "portaTime" });
-    perf.setPreferredColumns (1);
 }
 
 void PRA32ParameterPage::buildFx()
@@ -207,26 +206,44 @@ void PRA32ParameterPage::buildFx()
     chorus.setPreferredColumns (1);
 
     auto& delay = *addModule ("DELAY");
-    addToPanel (delay, { "delayTime", "delayDepth", "delayFeedback", "delayMode" });
-    delay.setPreferredColumns (4);
-    delay.setHeroLayout (true);
+    delay.setAutoLayout (false);
+    addToPanel (delay, { "delayTime", "delayMode", "delayDepth", "delayFeedback" });
+
+    if (auto* selector = dynamic_cast<SteppedSelector*> (find ("delayMode")))
+        selector->setGridColumns (2);
+}
+
+void PRA32ParameterPage::buildCharacter()
+{
+    auto& voice = *addModule ("VOICE");
+    voice.setAutoLayout (false);
+    addToPanel (voice, { "portaMode", "voiceAsgnMode", "bthAmpMod" });
+
+    if (auto* selector = dynamic_cast<SteppedSelector*> (find ("portaMode")))
+        selector->setGridColumns (3);
+    if (auto* selector = dynamic_cast<SteppedSelector*> (find ("voiceAsgnMode")))
+        selector->setGridColumns (1);
+    if (auto* selector = dynamic_cast<SteppedSelector*> (find ("bthAmpMod")))
+        selector->setGridColumns (1);
+
+    auto& character = *addModule ("VOICE CHARACTER");
+    addToPanel (character, { "egVelSens", "ampVelSens", "aftTlfoAmt" });
+    character.setPreferredColumns (3);
+
+    auto& perf = *addModule ("PERFORMANCE");
+    addToPanel (perf, { "pbRange", "portaTime" });
+    perf.setPreferredColumns (2);
+
+    auto& pitch = *addModule ("PITCH MODULATION");
+    pitch.setAutoLayout (false);
+    addToPanel (pitch, { "egOscAmt", "egOscDst" });
+
+    if (auto* selector = dynamic_cast<SteppedSelector*> (find ("egOscDst")))
+        selector->setGridColumns (3);
 
     auto& output = *addModule ("OUTPUT");
     addToPanel (output, { "pan", "ampGain", "ampExpnt" });
     output.setPreferredColumns (3);
-    output.setHeroLayout (true);
-}
-
-void PRA32ParameterPage::buildColor()
-{
-    auto& voice = *addModule ("VOICE");
-    addToPanel (voice, { "portaMode", "voiceAsgnMode", "bthAmpMod" });
-    voice.setPreferredColumns (3);
-    voice.setHeroLayout (true);
-
-    auto& character = *addModule ("CHARACTER");
-    addToPanel (character, { "egVelSens", "ampVelSens", "aftTlfoAmt" });
-    character.setPreferredColumns (3);
 }
 
 //==============================================================================
@@ -255,16 +272,66 @@ void PRA32ParameterPage::layoutOsc (juce::Rectangle<int> area)
 {
     const int gap = 8;
 
-    auto top = area.removeFromTop (juce::jmax (108, area.getHeight() * 34 / 100));
+    const int topHeight = area.getHeight() * 68 / 100;
+    auto topArea = area.removeFromTop (topHeight);
     area.removeFromTop (gap);
+    auto mixerArea = area;
 
-    auto leftWidth = area.getWidth() * 55 / 100;
-    auto left = area.removeFromLeft (leftWidth);
-    area.removeFromLeft (gap);
+    const int halfW = (topArea.getWidth() - gap) / 2;
+    auto osc1Area = topArea.removeFromLeft (halfW);
+    topArea.removeFromLeft (gap);
+    auto osc2Area = topArea;
 
-    if (auto* m = pageModule (moduleById, "OSCILLATOR 1")) m->setBounds (top);
-    if (auto* m = pageModule (moduleById, "OSCILLATOR 2")) m->setBounds (left);
-    if (auto* m = pageModule (moduleById, "MIXER"))        m->setBounds (area);
+    if (auto* m = pageModule (moduleById, "OSCILLATOR 1")) m->setBounds (osc1Area);
+    if (auto* m = pageModule (moduleById, "OSCILLATOR 2")) m->setBounds (osc2Area);
+    if (auto* m = pageModule (moduleById, "MIXER"))        m->setBounds (mixerArea);
+
+    // Layout OSCILLATOR 1 internally
+    {
+        auto inner = juce::Rectangle<int> (osc1Area.getWidth(), osc1Area.getHeight()).reduced (6, 4);
+        inner.removeFromTop (16);
+
+        const int topRowH = inner.getHeight() * 44 / 100;
+        auto topRow = inner.removeFromTop (topRowH);
+        auto botRow = inner;
+
+        const int wWave = topRow.getWidth() * 62 / 100;
+        if (auto* c = find ("osc1Wave")) c->setBounds (topRow.removeFromLeft (wWave).reduced (4, 4));
+        if (auto* c = find ("sawWMode")) c->setBounds (topRow.reduced (4, 4));
+
+        const int knobW = botRow.getWidth() / 3;
+        if (auto* c = find ("osc1Shape")) c->setBounds (botRow.removeFromLeft (knobW).reduced (4, 4));
+        if (auto* c = find ("osc1Morph")) c->setBounds (botRow.removeFromLeft (knobW).reduced (4, 4));
+        if (auto* c = find ("oscDrift")) c->setBounds (botRow.reduced (4, 4));
+    }
+
+    // Layout OSCILLATOR 2 internally
+    {
+        auto inner = juce::Rectangle<int> (osc2Area.getWidth(), osc2Area.getHeight()).reduced (6, 4);
+        inner.removeFromTop (16);
+
+        const int topRowH = inner.getHeight() * 44 / 100;
+        auto topRow = inner.removeFromTop (topRowH);
+        auto botRow = inner;
+
+        const int waveW = juce::jmin (topRow.getWidth() * 70 / 100, 280);
+        auto waveBounds = topRow.withSizeKeepingCentre (waveW, topRow.getHeight()).reduced (4, 4);
+        if (auto* c = find ("osc2Wave")) c->setBounds (waveBounds);
+
+        const int knobW = botRow.getWidth() / 2;
+        if (auto* c = find ("osc2Coarse")) c->setBounds (botRow.removeFromLeft (knobW).reduced (8, 4));
+        if (auto* c = find ("osc2Pitch"))  c->setBounds (botRow.reduced (8, 4));
+    }
+
+    // Layout MIXER internally
+    {
+        auto inner = juce::Rectangle<int> (mixerArea.getWidth(), mixerArea.getHeight()).reduced (6, 4);
+        inner.removeFromTop (16);
+
+        const int knobW = inner.getWidth() / 2;
+        if (auto* c = find ("oscMix")) c->setBounds (inner.removeFromLeft (knobW).reduced (12, 4));
+        if (auto* c = find ("subOsc")) c->setBounds (inner.reduced (12, 4));
+    }
 }
 
 void PRA32ParameterPage::layoutFilter (juce::Rectangle<int> area)
@@ -273,41 +340,63 @@ void PRA32ParameterPage::layoutFilter (juce::Rectangle<int> area)
 
     auto filterBounds = area.removeFromLeft (area.getWidth() * 62 / 100);
     area.removeFromLeft (gap);
+    auto shapingBounds = area;
 
-    if (auto* m = pageModule (moduleById, "FILTER"))  m->setBounds (filterBounds);
-    if (auto* m = pageModule (moduleById, "SHAPING")) m->setBounds (area);
+    if (auto* m = pageModule (moduleById, "FILTER NETWORK")) m->setBounds (filterBounds);
+    if (auto* m = pageModule (moduleById, "FILTER SHAPING")) m->setBounds (shapingBounds);
 
-    // Children of the FILTER panel use panel-local coordinates.
-    auto inner = juce::Rectangle<int> (filterBounds.getWidth(), filterBounds.getHeight())
-                     .reduced (6, 4);
-    inner.removeFromTop (16);
+    // Children of the FILTER NETWORK panel use panel-local coordinates.
+    {
+        auto inner = juce::Rectangle<int> (filterBounds.getWidth(), filterBounds.getHeight())
+                         .reduced (6, 4);
+        inner.removeFromTop (16);
 
-    auto topRow = inner.removeFromTop (juce::jmin (inner.getHeight() * 55 / 100, 220));
-    auto half = topRow.getWidth() / 2;
+        auto topRow = inner.removeFromTop (juce::jmin (inner.getHeight() * 52 / 100, 200));
+        const int half = topRow.getWidth() / 2;
 
-    if (auto* c = find ("filterCutoff")) c->setBounds (topRow.removeFromLeft (half).reduced (6, 0));
-    if (auto* c = find ("filterReso"))   c->setBounds (topRow.reduced (6, 0));
+        auto leftBox  = topRow.removeFromLeft (half).reduced (8, 0);
+        auto rightBox = topRow.reduced (8, 0);
 
-    inner.removeFromTop (6);
+        if (auto* c = find ("filterCutoff")) c->setBounds (leftBox);
+        if (auto* c = find ("filterReso"))   c->setBounds (rightBox);
 
-    if (graphs.size() > 0)
-        graphs[0]->setBounds (inner.reduced (6, 0));
+        inner.removeFromTop (6);
+
+        if (graphs.size() > 0)
+            graphs[0]->setBounds (inner.reduced (6, 0));
+    }
+
+    // Children of the FILTER SHAPING panel
+    {
+        auto inner = juce::Rectangle<int> (shapingBounds.getWidth(), shapingBounds.getHeight())
+                         .reduced (6, 4);
+        inner.removeFromTop (16);
+
+        auto row1 = inner.removeFromTop (inner.getHeight() * 40 / 100);
+        const int wMode = row1.getWidth() * 46 / 100;
+        if (auto* c = find ("filterMode")) c->setBounds (row1.removeFromLeft (wMode).reduced (4, 4));
+        if (auto* c = find ("egFltAmt"))   c->setBounds (row1.reduced (4, 4));
+
+        auto row2 = inner.removeFromTop (inner.getHeight() * 48 / 100);
+        const int halfKnob = row2.getWidth() / 2;
+        if (auto* c = find ("filterKeyTrk")) c->setBounds (row2.removeFromLeft (halfKnob).reduced (4, 4));
+        if (auto* c = find ("bthFltAmt"))    c->setBounds (row2.reduced (4, 4));
+
+        if (auto* c = find ("relEqDcy")) c->setBounds (inner.reduced (8, 4));
+    }
 }
 
 void PRA32ParameterPage::layoutEnvs (juce::Rectangle<int> area)
 {
     const int gap = 8;
+    const int half = (area.getWidth() - gap) / 2;
 
-    auto row = area.removeFromTop (area.getHeight() * 58 / 100);
-    auto modBounds = row.removeFromLeft (row.getWidth() / 2);
-    row.removeFromLeft (gap);
-    auto ampBounds = row;
-
-    area.removeFromTop (gap);
+    auto modBounds = area.removeFromLeft (half);
+    area.removeFromLeft (gap);
+    auto ampBounds = area;
 
     if (auto* m = pageModule (moduleById, "MOD ENVELOPE")) m->setBounds (modBounds);
     if (auto* m = pageModule (moduleById, "AMP ENVELOPE")) m->setBounds (ampBounds);
-    if (auto* m = pageModule (moduleById, "PITCH MOD"))    m->setBounds (area);
 
     auto placeEnvelope = [] (juce::Rectangle<int> moduleBounds, EnvelopePanel* env)
     {
@@ -324,40 +413,117 @@ void PRA32ParameterPage::layoutEnvs (juce::Rectangle<int> area)
 
 void PRA32ParameterPage::layoutMod (juce::Rectangle<int> area)
 {
-    const int gap = 8;
+    if (auto* m = pageModule (moduleById, "MODULATION LFO"))
+        m->setBounds (area);
 
-    auto left = area.removeFromLeft (area.getWidth() * 68 / 100);
-    area.removeFromLeft (gap);
+    auto inner = juce::Rectangle<int> (area.getWidth(), area.getHeight()).reduced (6, 4);
+    inner.removeFromTop (16);
 
-    if (auto* m = pageModule (moduleById, "LFO"))         m->setBounds (left);
-    if (auto* m = pageModule (moduleById, "PERFORMANCE")) m->setBounds (area);
+    const int halfH = inner.getHeight() / 2;
+    auto topRow = inner.removeFromTop (halfH);
+    auto botRow = inner;
+
+    const int waveW = juce::jmin (260, topRow.getWidth() * 32 / 100);
+    if (auto* c = find ("lfoWave")) c->setBounds (topRow.removeFromLeft (waveW).reduced (6, 6));
+
+    const int knobW = topRow.getWidth() / 3;
+    if (auto* c = find ("lfoRate"))     c->setBounds (topRow.removeFromLeft (knobW).reduced (4, 4));
+    if (auto* c = find ("lfoFadeTime")) c->setBounds (topRow.removeFromLeft (knobW).reduced (4, 4));
+    if (auto* c = find ("lfoDepth"))    c->setBounds (topRow.reduced (4, 4));
+
+    if (auto* c = find ("lfoOscDst")) c->setBounds (botRow.removeFromLeft (waveW).reduced (6, 6));
+
+    const int botKnobW = botRow.getWidth() / 2;
+    if (auto* c = find ("lfoFltAmt")) c->setBounds (botRow.removeFromLeft (botKnobW).reduced (12, 4));
+    if (auto* c = find ("lfoOscAmt")) c->setBounds (botRow.reduced (12, 4));
 }
 
 void PRA32ParameterPage::layoutFx (juce::Rectangle<int> area)
 {
     const int gap = 8;
-    const int total = area.getWidth();
+    const int chorusW = juce::jmax (260, area.getWidth() * 34 / 100);
 
-    auto chorus = area.removeFromLeft (total * 29 / 100);
+    auto chorus = area.removeFromLeft (chorusW);
     area.removeFromLeft (gap);
-    auto delay = area.removeFromLeft (total * 45 / 100);
-    area.removeFromLeft (gap);
-    auto output = area;
+    auto delay = area;
 
     if (auto* m = pageModule (moduleById, "CHORUS")) m->setBounds (chorus);
     if (auto* m = pageModule (moduleById, "DELAY"))  m->setBounds (delay);
-    if (auto* m = pageModule (moduleById, "OUTPUT")) m->setBounds (output);
+
+    auto inner = juce::Rectangle<int> (delay.getWidth(), delay.getHeight()).reduced (6, 4);
+    inner.removeFromTop (16);
+
+    const int halfH = inner.getHeight() / 2;
+    auto topRow = inner.removeFromTop (halfH);
+    auto botRow = inner;
+
+    const int halfW = topRow.getWidth() / 2;
+    if (auto* c = find ("delayTime"))     c->setBounds (topRow.removeFromLeft (halfW).reduced (6, 4));
+    if (auto* c = find ("delayMode"))     c->setBounds (topRow.reduced (16, 20));
+    if (auto* c = find ("delayDepth"))    c->setBounds (botRow.removeFromLeft (halfW).reduced (6, 4));
+    if (auto* c = find ("delayFeedback")) c->setBounds (botRow.reduced (6, 4));
 }
 
-void PRA32ParameterPage::layoutColor (juce::Rectangle<int> area)
+void PRA32ParameterPage::layoutCharacter (juce::Rectangle<int> area)
 {
     const int gap = 8;
+    const int rowHeight = (area.getHeight() - gap) / 2;
 
-    auto left = area.removeFromLeft (area.getWidth() / 2);
-    area.removeFromLeft (gap);
+    auto topRow = area.removeFromTop (rowHeight);
+    area.removeFromTop (gap);
+    auto botRow = area;
 
-    if (auto* m = pageModule (moduleById, "VOICE"))     m->setBounds (left);
-    if (auto* m = pageModule (moduleById, "CHARACTER")) m->setBounds (area);
+    // --- Row 1: VOICE (58%) & VOICE CHARACTER (42%) ---
+    const int voiceW = topRow.getWidth() * 58 / 100;
+    auto voiceBounds = topRow.removeFromLeft (voiceW);
+    topRow.removeFromLeft (gap);
+    auto charBounds = topRow;
+
+    if (auto* m = pageModule (moduleById, "VOICE"))           m->setBounds (voiceBounds);
+    if (auto* m = pageModule (moduleById, "VOICE CHARACTER")) m->setBounds (charBounds);
+
+    // Layout VOICE internally
+    {
+        auto inner = juce::Rectangle<int> (voiceBounds.getWidth(), voiceBounds.getHeight()).reduced (6, 4);
+        inner.removeFromTop (16);
+
+        const int wTotal = inner.getWidth();
+        const int wPorta = wTotal * 44 / 100;
+        const int wAsgn  = wTotal * 26 / 100;
+
+        auto rPorta = inner.removeFromLeft (wPorta).reduced (4, 4);
+        auto rAsgn  = inner.removeFromLeft (wAsgn).reduced (4, 4);
+        auto rBth   = inner.reduced (4, 4);
+
+        if (auto* c = find ("portaMode"))     c->setBounds (rPorta);
+        if (auto* c = find ("voiceAsgnMode")) c->setBounds (rAsgn);
+        if (auto* c = find ("bthAmpMod"))     c->setBounds (rBth);
+    }
+
+    // --- Row 2: PERFORMANCE (29%), PITCH MODULATION (39%), OUTPUT (32%) ---
+    const int totalBotW = botRow.getWidth() - 2 * gap;
+    const int perfW  = totalBotW * 29 / 100;
+    const int pitchW = totalBotW * 39 / 100;
+
+    auto perfBounds  = botRow.removeFromLeft (perfW);
+    botRow.removeFromLeft (gap);
+    auto pitchBounds = botRow.removeFromLeft (pitchW);
+    botRow.removeFromLeft (gap);
+    auto outBounds   = botRow;
+
+    if (auto* m = pageModule (moduleById, "PERFORMANCE"))      m->setBounds (perfBounds);
+    if (auto* m = pageModule (moduleById, "PITCH MODULATION")) m->setBounds (pitchBounds);
+    if (auto* m = pageModule (moduleById, "OUTPUT"))           m->setBounds (outBounds);
+
+    // Layout PITCH MODULATION internally
+    {
+        auto inner = juce::Rectangle<int> (pitchBounds.getWidth(), pitchBounds.getHeight()).reduced (6, 4);
+        inner.removeFromTop (16);
+
+        const int knobW = inner.getWidth() * 42 / 100;
+        if (auto* c = find ("egOscAmt")) c->setBounds (inner.removeFromLeft (knobW).reduced (4, 4));
+        if (auto* c = find ("egOscDst")) c->setBounds (inner.reduced (4, 4));
+    }
 }
 
 void PRA32ParameterPage::resized()
@@ -372,13 +538,14 @@ void PRA32ParameterPage::resized()
         return;
     }
 
-    if (section == "OSC")         layoutOsc (area);
-    else if (section == "FILTER") layoutFilter (area);
-    else if (section == "ENVS")   layoutEnvs (area);
-    else if (section == "MOD")    layoutMod (area);
-    else if (section == "FX")     layoutFx (area);
-    else if (section == "COLOR")  layoutColor (area);
-    else                          layoutStack (area, 8);
+    if (section == "OSC")              layoutOsc (area);
+    else if (section == "FILTER")      layoutFilter (area);
+    else if (section == "ENVS")        layoutEnvs (area);
+    else if (section == "MOD")         layoutMod (area);
+    else if (section == "FX")          layoutFx (area);
+    else if (section == "CHARACTER"
+          || section == "COLOR")       layoutCharacter (area);
+    else                               layoutStack (area, 8);
 }
 
 //==============================================================================
@@ -585,9 +752,9 @@ void PRA32ColorcoderAudioProcessorEditor::updatePresetDisplay()
     if (current >= 0)
         presetDisplay.setText (juce::String::formatted ("%02d  ", current)
                                    + PRA32ColorcoderAudioProcessor::factoryPresetName (current),
-                               "FACTORY PRESET");
+                               "PROGRAM / FACTORY");
     else
-        presetDisplay.setText ("--  USER / SESSION", "LOADED PATCH");
+        presetDisplay.setText ("--  USER / SESSION", "MANUAL / PATCH");
 
     presetDisplay.setPrimaryFont (presetFont());
 
@@ -647,15 +814,45 @@ void PRA32ColorcoderAudioProcessorEditor::paint (juce::Graphics& g)
     g.setColour (juce::Colours::white.withAlpha (0.05f));
     g.drawLine (0.0f, (float) header.getBottom() - 1.0f, w, (float) header.getBottom() - 1.0f, 1.0f);
 
-    // Serigraphed brand.
-    auto brand = header.reduced (juce::roundToInt (sc (22.0f)), juce::roundToInt (sc (6.0f)));
-    brand.setWidth (juce::roundToInt (sc (240.0f)));
+    // Serigraphed brand plate for Tonecoder TC-32.
+    const float brandLeft = railW + sc (8.0f);
+    const float brandTopY = sc (6.0f);
+    const float brandH    = (float) headerHeight - sc (12.0f);
+    const float brandW    = sc (290.0f);
+    auto brandArea = juce::Rectangle<float> (brandLeft, brandTopY, brandW, brandH);
 
-    drawEngravedText (g, "PRA32", brand.removeFromTop (brand.getHeight() / 2).toFloat(),
-                      brandFont(), juce::Justification::centredLeft, textPrimary,
+    // Discrete signal/power status lamp
+    const float lampSize = sc (9.0f);
+    auto lampBox = brandArea.removeFromLeft (lampSize + sc (8.0f))
+                            .withSizeKeepingCentre (lampSize, lampSize);
+    drawLamp (g, lampBox, amberBright, 0.85f, sc (2.5f));
+
+    auto brandUpper = brandArea.removeFromTop (brandArea.getHeight() * 0.54f);
+    auto brandLower = brandArea;
+
+    // Model inscription "TC-32"
+    const float modelTextW = sc (52.0f);
+    auto modelRect = brandUpper.removeFromLeft (modelTextW);
+    drawEngravedText (g, "TC-32", modelRect,
+                      juce::Font (juce::FontOptions (16.0f).withStyle ("Bold")),
+                      juce::Justification::centredLeft, amberBright,
                       engraveShadow.withAlpha (0.8f));
-    drawEngravedText (g, "C O L O R C O D E R", brand.toFloat(), legendFont(),
-                      juce::Justification::centredLeft, amber,
+
+    // Divider dot
+    g.setColour (textDim.withAlpha (0.8f));
+    const float dotX = modelRect.getRight() + sc (2.0f);
+    const float dotY = brandUpper.getCentreY();
+    g.fillEllipse (dotX, dotY - sc (1.5f), sc (3.0f), sc (3.0f));
+
+    // Brand inscription "T O N E C O D E R"
+    brandUpper.removeFromLeft (sc (9.0f));
+    drawEngravedText (g, "T O N E C O D E R", brandUpper,
+                      brandFont(), juce::Justification::centredLeft, textPrimary,
+                      engraveShadow.withAlpha (0.85f));
+
+    // Secondary technical inscription "FOUR-VOICE POLYPHONIC SIGNAL SYNTHESIZER"
+    drawEngravedText (g, "FOUR-VOICE POLYPHONIC SIGNAL SYNTHESIZER", brandLower,
+                      subBrandFont(), juce::Justification::centredLeft, textSecondary,
                       engraveShadow.withAlpha (0.7f));
 
     // Keyboard rack plate.
@@ -674,8 +871,8 @@ void PRA32ColorcoderAudioProcessorEditor::paint (juce::Graphics& g)
 
         drawLamp (g, lampArea.toFloat(), amber, 0.7f, sc (2.5f));
         drawEngravedText (g, "KEYBOARD", label.toFloat(), legendFont(),
-                          juce::Justification::centredLeft, textSecondary,
-                          engraveShadow.withAlpha (0.6f));
+                           juce::Justification::centredLeft, textSecondary,
+                           engraveShadow.withAlpha (0.6f));
     }
 }
 
@@ -693,8 +890,8 @@ void PRA32ColorcoderAudioProcessorEditor::resized()
     auto header = r.removeFromTop (headerHeight).reduced (margin, juce::roundToInt (sc (9.0f)));
 
     const bool compact = getWidth() < 860;
-    const int utilityW = juce::roundToInt (sc (compact ? 70.0f : 88.0f));
-    const int keysW    = juce::roundToInt (sc (56.0f));
+    const int utilityW = juce::roundToInt (sc (compact ? 66.0f : 80.0f));
+    const int keysW    = juce::roundToInt (sc (compact ? 48.0f : 54.0f));
     auto utility = header.removeFromRight (utilityW * 3 + keysW + gap * 3);
     keyboardButton.setBounds (utility.removeFromRight (keysW));
     utility.removeFromRight (gap);
@@ -704,12 +901,18 @@ void PRA32ColorcoderAudioProcessorEditor::resized()
     utility.removeFromRight (gap);
     initButton.setBounds (utility.removeFromRight (utilityW));
 
-    const int presetGroupW = juce::jmin (juce::roundToInt (sc (400.0f)), header.getWidth() - gap * 4);
+    // Brand reservation on left
+    const int brandReservedW = juce::roundToInt (sc (compact ? 240.0f : 295.0f));
+    header.removeFromLeft (brandReservedW + gap);
+
+    // Preset group centered in remaining area
+    const int presetGroupW = juce::jmin (juce::roundToInt (sc (340.0f)), header.getWidth());
     auto presetGroup = header.withSizeKeepingCentre (presetGroupW, header.getHeight());
-    presetPrevButton.setBounds (presetGroup.removeFromLeft (juce::roundToInt (sc (30.0f))));
-    presetNextButton.setBounds (presetGroup.removeFromRight (juce::roundToInt (sc (30.0f))));
-    presetDisplay.setBounds (presetGroup.reduced (juce::roundToInt (sc (6.0f)),
-                                                 juce::roundToInt (sc (2.0f))));
+    const int arrowW = juce::roundToInt (sc (28.0f));
+    presetPrevButton.setBounds (presetGroup.removeFromLeft (arrowW));
+    presetNextButton.setBounds (presetGroup.removeFromRight (arrowW));
+    presetDisplay.setBounds (presetGroup.reduced (juce::roundToInt (sc (4.0f)),
+                                                 juce::roundToInt (sc (1.0f))));
 
     // ---- Section bar --------------------------------------------------------
     sectionSelector.setBounds (r.removeFromTop (sectionBarHeight).reduced (margin,
@@ -730,6 +933,8 @@ void PRA32ColorcoderAudioProcessorEditor::resized()
         keyboardKeys = inner;
 
         keyboardComponent.setVisible (true);
+        constexpr int numWhiteKeys = 36;
+        keyboardComponent.setKeyWidth ((float) keyboardKeys.getWidth() / (float) numWhiteKeys);
         keyboardComponent.setBounds (keyboardKeys);
 
         // Octave shift lives on the keyboard plate header, left of the lamp.

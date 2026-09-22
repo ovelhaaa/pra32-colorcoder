@@ -12,11 +12,11 @@ FetchContent_MakeAvailable(juce)
 
 # Create a JUCE plugin target
 juce_add_plugin(PRA32ColorcoderPlugin
-    COMPANY_NAME "PRA32"
+    COMPANY_NAME "Tonecoder"
     PLUGIN_MANUFACTURER_CODE "PR32"
     PLUGIN_CODE "Colr"
     FORMATS VST3 Standalone
-    PRODUCT_NAME "PRA32 Colorcoder"
+    PRODUCT_NAME "Tonecoder TC-32"
     IS_SYNTH TRUE
     NEEDS_MIDI_INPUT TRUE
     NEEDS_MIDI_OUTPUT FALSE

@@ -8,7 +8,7 @@ juce::StringArray enumLfoWave()    { return { "TRI", "SINE", "NOISE", "SAW", "S&
 juce::StringArray enumFilterMode() { return { "LOW PASS", "HIGH PASS" }; }
 juce::StringArray enumSawMode()    { return { "STRAIGHT", "CURVED" }; }
 juce::StringArray enumModDst()     { return { "PITCH 1+2", "PITCH 1+2", "PITCH 2", "PITCH 2", "CUTOFF", "SHAPE 1" }; }
-juce::StringArray enumVoiceMode()  { return { "POLY", "POLY", "MONO", "MONO", "LEGATO PORTA", "LEGATO" }; }
+juce::StringArray enumVoiceMode()  { return { "POLY", "POLY", "MONO", "MONO", "LGTO PORTA", "LEGATO" }; }
 juce::StringArray enumAsgnMode()   { return { "MODE 1", "MODE 2" }; }
 juce::StringArray enumBreathAmp()  { return { "OFF", "QUAD", "LIN" }; }
 juce::StringArray enumDelayMode()  { return { "STEREO", "PING PONG" }; }
@@ -108,10 +108,10 @@ const std::vector<SynthParamData>& SynthParameters::getParameters()
           "ENVS", "AMP ENVELOPE", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Milliseconds, "ms", {}, 2 },
         { "egOscAmt", "EG Pitch Amount", "PITCH MOD", "EG_OSC_AMT", ccEgOscAmt, 0, 127, 64,
-          "ENVS", "PITCH MOD", PRA32ControlKind::BipolarRotary, true, 64,
+          "CHARACTER", "PITCH MOD", PRA32ControlKind::BipolarRotary, true, 64,
           PRA32FormatKind::PitchModAmount, "", {}, 2 },
         { "egOscDst", "EG Mod Destination", "EG DEST", "EG_OSC_DST", ccEgOscDst, 0, 127, 0,
-          "ENVS", "PITCH MOD", PRA32ControlKind::SteppedSelector, false, 0,
+          "CHARACTER", "PITCH MOD", PRA32ControlKind::SteppedSelector, false, 0,
           PRA32FormatKind::Enum, "", enumModDst(), 1 },
 
         // ---------------------------------------------------------------------
@@ -139,10 +139,10 @@ const std::vector<SynthParamData>& SynthParameters::getParameters()
           "MOD", "LFO", PRA32ControlKind::SteppedSelector, false, 0,
           PRA32FormatKind::Enum, "", enumModDst(), 1 },
         { "pbRange", "Pitch Bend Range", "BEND RANGE", "P_BEND_RANGE", ccPbRange, 0, 127, 2,
-          "MOD", "PERFORMANCE", PRA32ControlKind::Rotary, false, 0,
+          "CHARACTER", "PERFORMANCE", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Semitones, "st", {}, 1 },
         { "portaTime", "Portamento", "GLIDE TIME", "PORTAMENTO", ccPortamento, 0, 127, 0,
-          "MOD", "PERFORMANCE", PRA32ControlKind::Rotary, false, 0,
+          "CHARACTER", "PERFORMANCE", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Portamento, "ms", {}, 1 },
 
         // ---------------------------------------------------------------------
@@ -170,35 +170,35 @@ const std::vector<SynthParamData>& SynthParameters::getParameters()
           "FX", "DELAY", PRA32ControlKind::SteppedSelector, false, 0,
           PRA32FormatKind::Enum, "", enumDelayMode(), 1 },
         { "pan", "Pan", "PAN", "PAN", ccPan, 0, 127, 64,
-          "FX", "OUTPUT", PRA32ControlKind::BipolarRotary, true, 64,
+          "CHARACTER", "OUTPUT", PRA32ControlKind::BipolarRotary, true, 64,
           PRA32FormatKind::Pan, "", {}, 2 },
         { "ampGain", "Amp Gain", "AMP GAIN", "AMP_GAIN", ccAmpGain, 0, 127, 64,
-          "FX", "OUTPUT", PRA32ControlKind::Rotary, false, 0,
+          "CHARACTER", "OUTPUT", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Decibels, "dB", {}, 3 },
         { "ampExpnt", "EG Amp Mod", "EG AMP MOD", "EG_AMP_MOD", ccEgAmpMod, 0, 127, 0,
-          "FX", "OUTPUT", PRA32ControlKind::Toggle, false, 0,
+          "CHARACTER", "OUTPUT", PRA32ControlKind::Toggle, false, 0,
           PRA32FormatKind::OnOff, "", enumOnOff(), 1 },
 
         // ---------------------------------------------------------------------
-        // COLOR
+        // CHARACTER
         // ---------------------------------------------------------------------
         { "portaMode", "Voice Mode", "VOICE MODE", "VOICE_MODE", ccVoiceMode, 0, 127, 0,
-          "COLOR", "VOICE", PRA32ControlKind::SteppedSelector, false, 0,
+          "CHARACTER", "VOICE", PRA32ControlKind::SteppedSelector, false, 0,
           PRA32FormatKind::Enum, "", enumVoiceMode(), 2 },
         { "voiceAsgnMode", "Voice Assign Mode", "VOICE ASSIGN", "VOICE_ASGN_MODE", ccVoiceAsgnMode, 0, 127, 0,
-          "COLOR", "VOICE", PRA32ControlKind::SteppedSelector, false, 0,
+          "CHARACTER", "VOICE", PRA32ControlKind::SteppedSelector, false, 0,
           PRA32FormatKind::Enum, "", enumAsgnMode(), 1 },
         { "bthAmpMod", "Breath Amp Mod", "BREATH AMP", "BTH_AMP_MOD", ccBthAmpMod, 0, 127, 0,
-          "COLOR", "BREATH", PRA32ControlKind::SteppedSelector, false, 0,
+          "CHARACTER", "VOICE", PRA32ControlKind::SteppedSelector, false, 0,
           PRA32FormatKind::Enum, "", enumBreathAmp(), 1 },
         { "egVelSens", "EG Velocity Sensitivity", "MOD VEL", "EG_VEL_SENS", ccEgVelSens, 0, 127, 0,
-          "COLOR", "CHARACTER", PRA32ControlKind::Rotary, false, 0,
+          "CHARACTER", "VOICE CHARACTER", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Percent, "%", {}, 1 },
         { "ampVelSens", "Amp Velocity Sensitivity", "AMP VEL", "AMP_VEL_SENS", ccAmpVelSens, 0, 127, 0,
-          "COLOR", "CHARACTER", PRA32ControlKind::Rotary, false, 0,
+          "CHARACTER", "VOICE CHARACTER", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Percent, "%", {}, 1 },
         { "aftTlfoAmt", "After Touch LFO Amount", "AT LFO AMT", "AFT_T_LFO_AMT", ccAftTlfoAmt, 0, 127, 0,
-          "COLOR", "CHARACTER", PRA32ControlKind::Rotary, false, 0,
+          "CHARACTER", "VOICE CHARACTER", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Percent, "%", {}, 1 }
     };
 
