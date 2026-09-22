@@ -89,6 +89,30 @@ static const char* factoryPresetsJson = R"(
 )";
 
 //==============================================================================
+const char* const PRA32ColorcoderAudioProcessor::factoryPresetNames[16] = {
+    "INITIALIZATION", "SYNC LEAD", "SYNTH BRASS", "PLUCK SYNTH",
+    "MONO SYNTH", "SYNTH BASS 1", "SYNTH BASS 2", "SYNTH BASS 3",
+    "ETHEREAL PAD", "GRITTY BASS", "CHIPTUNE LEAD", "PERCUSSIVE PLUCK",
+    "CLASSIC SWEEP", "DARK DRONE", "NOISE PERCUSSION", "BELL LEAD"
+};
+
+juce::String PRA32ColorcoderAudioProcessor::factoryPresetName (int index)
+{
+    return (index >= 0 && index < 16) ? factoryPresetNames[index] : juce::String();
+}
+
+juce::var PRA32ColorcoderAudioProcessor::getUiProperty (const juce::Identifier& key) const
+{
+    return apvts.state.getProperty (key);
+}
+
+void PRA32ColorcoderAudioProcessor::setUiProperty (const juce::Identifier& key,
+                                                   const juce::var& value)
+{
+    apvts.state.setProperty (key, value, nullptr);
+}
+
+//==============================================================================
 PRA32ColorcoderAudioProcessor::PRA32ColorcoderAudioProcessor()
      : AudioProcessor (BusesProperties()
                      #if ! JucePlugin_IsMidiEffect
@@ -228,6 +252,10 @@ void PRA32ColorcoderAudioProcessor::loadPreset(int index)
             }
         }
     }
+
+    currentFactoryPreset = juce::jlimit (0, 15, index);
+    setUiProperty ("uiPreset", currentFactoryPreset);
+    sendChangeMessage();
 }
 
 void PRA32ColorcoderAudioProcessor::loadPresetFromJson(const juce::String& jsonString)
@@ -274,6 +302,10 @@ void PRA32ColorcoderAudioProcessor::loadPresetFromJson(const juce::String& jsonS
             }
         }
     }
+
+    currentFactoryPreset = -1;
+    setUiProperty ("uiPreset", -1);
+    sendChangeMessage();
 }
 
 juce::String PRA32ColorcoderAudioProcessor::savePresetToJson()
@@ -428,9 +460,18 @@ void PRA32ColorcoderAudioProcessor::getStateInformation (juce::MemoryBlock& dest
 void PRA32ColorcoderAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
     std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
+
     if (xmlState != nullptr)
+    {
         if (xmlState->hasTagName (apvts.state.getType()))
+        {
             apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
+
+            const auto presetVar = getUiProperty ("uiPreset");
+            currentFactoryPreset = presetVar.isVoid() ? -1 : (int) presetVar;
+            sendChangeMessage();
+        }
+    }
 }
 
 //==============================================================================

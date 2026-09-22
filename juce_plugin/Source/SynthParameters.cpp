@@ -174,7 +174,7 @@ const std::vector<SynthParamData>& SynthParameters::getParameters()
           PRA32FormatKind::Pan, "", {}, 2 },
         { "ampGain", "Amp Gain", "AMP GAIN", "AMP_GAIN", ccAmpGain, 0, 127, 64,
           "FX", "OUTPUT", PRA32ControlKind::Rotary, false, 0,
-          PRA32FormatKind::Decibels, "dB", {}, 2 },
+          PRA32FormatKind::Decibels, "dB", {}, 3 },
         { "ampExpnt", "EG Amp Mod", "EG AMP MOD", "EG_AMP_MOD", ccEgAmpMod, 0, 127, 0,
           "FX", "OUTPUT", PRA32ControlKind::Toggle, false, 0,
           PRA32FormatKind::OnOff, "", enumOnOff(), 1 },

@@ -221,6 +221,18 @@ ParameterKnob::ParameterKnob (const SynthParamData& info,
 
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, param.id, *this);
+
+    textFromValueFunction = [this] (double v)
+    {
+        return PRA32ValueFormatter::format (param, (int) std::lround (v));
+    };
+    setPopupDisplayEnabled (false, true, nullptr, 500);
+}
+
+juce::String ParameterKnob::getTooltip()
+{
+    return param.displayName + "   "
+         + PRA32ValueFormatter::format (param, (int) std::lround (getValue()));
 }
 
 void ParameterKnob::paint (juce::Graphics& g)
@@ -246,6 +258,12 @@ void ParameterKnob::paint (juce::Graphics& g)
     g.setColour (isMouseOverOrDragging() ? accent.brighter (0.2f) : textPrimary);
     g.drawFittedText (PRA32ValueFormatter::format (param, (int) std::lround (getValue())),
                       valueArea.toNearestInt(), juce::Justification::centred, 1);
+
+    if (hasKeyboardFocus (true))
+    {
+        g.setColour (accent.withAlpha (0.7f));
+        g.drawRoundedRectangle (getLocalBounds().toFloat().reduced (1.0f), radiusSmall, 1.2f);
+    }
 }
 
 //==============================================================================
@@ -258,9 +276,22 @@ SteppedSelector::SteppedSelector (const SynthParamData& info,
     setRange ((double) param.min, (double) param.max, 1.0);
     setDoubleClickReturnValue (true, (double) param.def);
     setVelocityBasedMode (false);
+    setWantsKeyboardFocus (true);
 
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment> (
         apvts, param.id, *this);
+
+    textFromValueFunction = [this] (double v)
+    {
+        return PRA32ValueFormatter::format (param, (int) std::lround (v));
+    };
+    setPopupDisplayEnabled (false, true, nullptr, 500);
+}
+
+juce::String SteppedSelector::getTooltip()
+{
+    return param.displayName + "   "
+         + PRA32ValueFormatter::format (param, (int) std::lround (getValue()));
 }
 
 void SteppedSelector::setGridColumns (int columns)
@@ -370,6 +401,12 @@ void SteppedSelector::paint (juce::Graphics& g)
                       labelFont(), juce::Justification::centred, textSecondary,
                       engraveShadow.withAlpha (0.6f));
 
+    if (hasKeyboardFocus (true))
+    {
+        g.setColour (accent.withAlpha (0.7f));
+        g.drawRoundedRectangle (getLocalBounds().toFloat().reduced (1.0f), radiusSmall, 1.2f);
+    }
+
     juce::ignoreUnused (valueArea);
 }
 
@@ -379,10 +416,16 @@ ToggleSwitch::ToggleSwitch (const SynthParamData& info,
     : juce::Button (info.id), param (info)
 {
     setClickingTogglesState (true);
+    setWantsKeyboardFocus (true);
     setToggleState ((double) param.def >= 64.0, juce::dontSendNotification);
 
     attachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
         apvts, param.id, *this);
+}
+
+juce::String ToggleSwitch::getTooltip()
+{
+    return param.displayName + "   " + (getToggleState() ? "ON" : "OFF");
 }
 
 void ToggleSwitch::paintButton (juce::Graphics& g, bool highlighted, bool down)
@@ -423,6 +466,12 @@ void ToggleSwitch::paintButton (juce::Graphics& g, bool highlighted, bool down)
     g.setColour (on ? juce::Colours::black : textSecondary);
     g.setFont (valueFont());
     g.drawText (on ? "ON" : "OFF", paddle.toNearestInt(), juce::Justification::centred, false);
+
+    if (hasKeyboardFocus (true))
+    {
+        g.setColour (accent.withAlpha (0.7f));
+        g.drawRoundedRectangle (getLocalBounds().toFloat().reduced (1.0f), radiusSmall, 1.2f);
+    }
 }
 
 //==============================================================================
@@ -431,9 +480,10 @@ ModulePanel::ModulePanel (juce::String t, juce::String sub, juce::Colour a)
 {
 }
 
-void ModulePanel::addControl (juce::Component& control)
+void ModulePanel::addControl (juce::Component& control, int visualWeight)
 {
     controls.add (&control);
+    weights.add (juce::jlimit (1, 3, visualWeight));
     addAndMakeVisible (control);
 }
 
@@ -481,6 +531,39 @@ void ModulePanel::resized()
     const int n = controls.size();
     if (n == 0)
         return;
+
+    if (heroLayout && n >= 2)
+    {
+        int heroIndex = 0;
+        for (int i = 1; i < n; ++i)
+            if (weights[i] > weights[heroIndex])
+                heroIndex = i;
+
+        const int heroW = juce::jmin (area.getWidth() * 44 / 100, area.getHeight());
+        auto heroArea = area.removeFromLeft (heroW);
+        controls[heroIndex]->setBounds (heroArea);
+
+        juce::Array<juce::Component*> rest;
+        for (int i = 0; i < n; ++i)
+            if (i != heroIndex)
+                rest.add (controls[i]);
+
+        const int rn = rest.size();
+        int cols = (rn <= 2) ? rn : (rn <= 4 ? 2 : 3);
+        if (area.getWidth() < 60 * cols)
+            cols = juce::jmax (1, area.getWidth() / 60);
+
+        const int rows = (rn + cols - 1) / cols;
+        const int cellW = area.getWidth() / cols;
+        const int cellH = area.getHeight() / juce::jmax (1, rows);
+
+        for (int i = 0; i < rn; ++i)
+            rest[i]->setBounds (area.getX() + (i % cols) * cellW,
+                                area.getY() + (i / cols) * cellH,
+                                cellW, cellH);
+
+        return;
+    }
 
     int cols = juce::jmax (1, juce::jmin (columnsHint, n));
     if (getWidth() < 60 * cols)

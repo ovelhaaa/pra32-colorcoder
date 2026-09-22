@@ -336,6 +336,13 @@ def keyboard():
         out.append(screw(sx, sy, 3.0))
 
     out.append(txt(x0 + 18, y0 + 15, "KEYBOARD", 9, TEXT2, anchor="start", weight="600"))
+
+    bw, bh = 34, 12
+    bx = x0 + w - 32 - (bw + 4) * 2
+    for i, lab in enumerate(["OCT -", "OCT +"]):
+        out.append(rect(bx + i * (bw + 4), y0 + 8, bw, bh, PANEL_RAISED, rx=3, stroke=BORDER))
+        out.append(txt(bx + i * (bw + 4) + bw / 2, y0 + 8 + bh - 3, lab, 7.0, TEXT2, font=MONO))
+
     out.append(rect(x0 + w - 26, y0 + 8, 12, 12, "#0a0c0e", rx=2, stroke="#000000"))
     out.append(circle(x0 + w - 20, y0 + 14, 3.5, AMBER, opacity=0.85))
 

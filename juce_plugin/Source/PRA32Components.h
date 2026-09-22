@@ -17,6 +17,7 @@ public:
 
     const SynthParamData& parameter() const noexcept { return param; }
 
+    juce::String getTooltip() override;
     void paint (juce::Graphics&) override;
 
 private:
@@ -38,6 +39,7 @@ public:
     // this many columns (e.g. 3 columns x 2 rows for six positions).
     void setGridColumns (int columns);
 
+    juce::String getTooltip() override;
     void paint (juce::Graphics&) override;
     void mouseDown (const juce::MouseEvent&) override;
     void mouseDrag (const juce::MouseEvent&) override;
@@ -59,6 +61,7 @@ class ToggleSwitch : public juce::Button
 public:
     ToggleSwitch (const SynthParamData& info, juce::AudioProcessorValueTreeState& apvts);
 
+    juce::String getTooltip() override;
     void paintButton (juce::Graphics&, bool shouldDrawButtonAsHighlighted,
                       bool shouldDrawButtonAsDown) override;
 
@@ -76,7 +79,7 @@ class ModulePanel : public juce::Component
 public:
     ModulePanel (juce::String title, juce::String subsection, juce::Colour accent);
 
-    void addControl (juce::Component& control);
+    void addControl (juce::Component& control, int visualWeight = 2);
     void paint (juce::Graphics&) override;
     void resized() override;
 
@@ -84,13 +87,19 @@ public:
     void setPreferredColumns (int c) noexcept { columnsHint = juce::jmax (1, c); }
     void setAutoLayout (bool shouldAutoLayout) noexcept { autoLayout = shouldAutoLayout; }
 
+    // Highlights the heaviest control as a large "hero" on the left, with the
+    // remaining controls in a grid to its right.
+    void setHeroLayout (bool shouldUseHero) noexcept { heroLayout = shouldUseHero; }
+
 private:
     juce::String title;
     juce::String subsection;
     juce::Colour accent;
     int columnsHint = 4;
     bool autoLayout = true;
+    bool heroLayout = false;
     juce::Array<juce::Component*> controls;
+    juce::Array<int> weights;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ModulePanel)
 };

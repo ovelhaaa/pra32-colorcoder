@@ -58,7 +58,8 @@ private:
 };
 
 //==============================================================================
-class PRA32ColorcoderAudioProcessorEditor  : public juce::AudioProcessorEditor
+class PRA32ColorcoderAudioProcessorEditor  : public juce::AudioProcessorEditor,
+                                             private juce::ChangeListener
 {
 public:
     explicit PRA32ColorcoderAudioProcessorEditor (PRA32ColorcoderAudioProcessor&);
@@ -72,8 +73,10 @@ private:
     void loadPreset (int index);
     void updatePresetDisplay();
     void showPresetMenu();
+    void updateKeyboardRange();
 
-    static const char* presetName (int index);
+    void changeListenerCallback (juce::ChangeBroadcaster*) override;
+    void storeUiState();
 
     PRA32ColorcoderAudioProcessor& audioProcessor;
     PRA32LookAndFeel customLookAndFeel;
@@ -91,10 +94,14 @@ private:
     PRA32Keyboard keyboardComponent;
     std::unique_ptr<juce::FileChooser> fileChooser;
 
+    juce::TextButton octaveDownButton { "OCT -" };
+    juce::TextButton octaveUpButton   { "OCT +" };
+    juce::TooltipWindow tooltipWindow { this, 700 };
+
     juce::Rectangle<int> keyboardFrame;
     juce::Rectangle<int> keyboardKeys;
 
-    int presetIndex = 0;
+    int keyboardBaseNote = 36;
     bool keyboardVisible = true;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PRA32ColorcoderAudioProcessorEditor)

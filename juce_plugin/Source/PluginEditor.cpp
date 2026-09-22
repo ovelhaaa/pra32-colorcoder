@@ -6,21 +6,13 @@ using namespace PRA32Theme;
 
 namespace {
 
-const char* const kPresetNames[16] = {
-    "INITIALIZATION", "SYNC LEAD", "SYNTH BRASS", "PLUCK SYNTH",
-    "MONO SYNTH", "SYNTH BASS 1", "SYNTH BASS 2", "SYNTH BASS 3",
-    "ETHEREAL PAD", "GRITTY BASS", "CHIPTUNE LEAD", "PERCUSSIVE PLUCK",
-    "CLASSIC SWEEP", "DARK DRONE", "NOISE PERCUSSION", "BELL LEAD"
-};
-
 const char* const kSections[6] = { "OSC", "FILTER", "ENVS", "MOD", "FX", "COLOR" };
 
-} // namespace
+const juce::Identifier uiSectionProperty  { "uiSection" };
+const juce::Identifier uiKeyboardProperty { "uiKeyboard" };
+const juce::Identifier uiOctaveProperty   { "uiOctave" };
 
-const char* PRA32ColorcoderAudioProcessorEditor::presetName (int index)
-{
-    return (index >= 0 && index < 16) ? kPresetNames[index] : "";
-}
+} // namespace
 
 //==============================================================================
 PRA32ParameterPage::PRA32ParameterPage (PRA32ColorcoderAudioProcessor& p,
@@ -76,8 +68,9 @@ juce::Component* PRA32ParameterPage::addParam (const juce::String& id)
 
 void PRA32ParameterPage::addToPanel (ModulePanel& panel, const juce::String& id)
 {
-    if (auto* control = addParam (id))
-        panel.addControl (*control);
+    if (const auto* info = SynthParameters::find (id))
+        if (auto* control = addParam (id))
+            panel.addControl (*control, info->visualWeight);
 }
 
 void PRA32ParameterPage::addToPanel (ModulePanel& panel,
@@ -133,6 +126,7 @@ void PRA32ParameterPage::buildOsc()
     auto& osc1 = *addModule ("OSCILLATOR 1");
     addToPanel (osc1, { "osc1Wave", "osc1Shape", "osc1Morph", "oscDrift", "sawWMode" });
     osc1.setPreferredColumns (5);
+    osc1.setHeroLayout (true);
 
     auto& osc2 = *addModule ("OSCILLATOR 2");
     addToPanel (osc2, { "osc2Wave", "osc2Coarse", "osc2Pitch" });
@@ -199,6 +193,8 @@ void PRA32ParameterPage::buildMod()
     if (auto* selector = dynamic_cast<SteppedSelector*> (find ("lfoOscDst")))
         selector->setGridColumns (3);
 
+    lfo.setHeroLayout (true);
+
     auto& perf = *addModule ("PERFORMANCE");
     addToPanel (perf, { "pbRange", "portaTime" });
     perf.setPreferredColumns (1);
@@ -212,11 +208,13 @@ void PRA32ParameterPage::buildFx()
 
     auto& delay = *addModule ("DELAY");
     addToPanel (delay, { "delayTime", "delayDepth", "delayFeedback", "delayMode" });
-    delay.setPreferredColumns (2);
+    delay.setPreferredColumns (4);
+    delay.setHeroLayout (true);
 
     auto& output = *addModule ("OUTPUT");
     addToPanel (output, { "pan", "ampGain", "ampExpnt" });
-    output.setPreferredColumns (1);
+    output.setPreferredColumns (3);
+    output.setHeroLayout (true);
 }
 
 void PRA32ParameterPage::buildColor()
@@ -224,6 +222,7 @@ void PRA32ParameterPage::buildColor()
     auto& voice = *addModule ("VOICE");
     addToPanel (voice, { "portaMode", "voiceAsgnMode", "bthAmpMod" });
     voice.setPreferredColumns (3);
+    voice.setHeroLayout (true);
 
     auto& character = *addModule ("CHARACTER");
     addToPanel (character, { "egVelSens", "ampVelSens", "aftTlfoAmt" });
@@ -389,6 +388,7 @@ PRA32ColorcoderAudioProcessorEditor::PRA32ColorcoderAudioProcessorEditor (
       keyboardComponent (audioProcessor.keyboardState)
 {
     setLookAndFeel (&customLookAndFeel);
+    audioProcessor.addChangeListener (this);
 
     for (int i = 0; i < 6; ++i)
     {
@@ -400,8 +400,14 @@ PRA32ColorcoderAudioProcessorEditor::PRA32ColorcoderAudioProcessorEditor (
                                    kSections[3], kSections[4], kSections[5] });
     sectionSelector.onSectionChanged = [this] (int index) { showPage (index); };
 
-    presetPrevButton.onClick = [this] () { loadPreset ((presetIndex + 15) % 16); };
-    presetNextButton.onClick = [this] () { loadPreset ((presetIndex + 1) % 16); };
+    presetPrevButton.onClick = [this] ()
+    {
+        loadPreset ((juce::jmax (0, audioProcessor.getCurrentFactoryPreset()) + 15) % 16);
+    };
+    presetNextButton.onClick = [this] ()
+    {
+        loadPreset ((juce::jmax (0, audioProcessor.getCurrentFactoryPreset()) + 1) % 16);
+    };
     presetDisplay.onClick   = [this] () { showPresetMenu(); };
 
     loadButton.onClick = [this] ()
@@ -432,15 +438,41 @@ PRA32ColorcoderAudioProcessorEditor::PRA32ColorcoderAudioProcessorEditor (
         });
     };
 
+    // Restore persisted UI state (falls back to defaults on first run).
+    int startSection = 0;
+    {
+        const auto s = audioProcessor.getUiProperty (uiSectionProperty);
+        const auto k = audioProcessor.getUiProperty (uiKeyboardProperty);
+        const auto o = audioProcessor.getUiProperty (uiOctaveProperty);
+
+        if (! s.isVoid()) startSection = juce::jlimit (0, 5, (int) s);
+        keyboardVisible  = k.isVoid() ? true : (bool) k;
+        keyboardBaseNote = o.isVoid() ? 36   : juce::jlimit (0, 67, (int) o);
+    }
+
     keyboardButton.setClickingTogglesState (true);
-    keyboardButton.setToggleState (true, juce::dontSendNotification);
+    keyboardButton.setToggleState (keyboardVisible, juce::dontSendNotification);
     keyboardButton.onClick = [this] ()
     {
         keyboardVisible = keyboardButton.getToggleState();
+        storeUiState();
         resized();
     };
 
-    keyboardComponent.setAvailableRange (36, 96);
+    octaveDownButton.onClick = [this] ()
+    {
+        keyboardBaseNote = juce::jmax (0, keyboardBaseNote - 12);
+        updateKeyboardRange();
+        storeUiState();
+    };
+    octaveUpButton.onClick = [this] ()
+    {
+        keyboardBaseNote = juce::jmin (127 - 60, keyboardBaseNote + 12);
+        updateKeyboardRange();
+        storeUiState();
+    };
+
+    updateKeyboardRange();
     keyboardComponent.setKeyWidth (20.0f);
     keyboardComponent.setBlackNoteWidthProportion (0.6f);
     keyboardComponent.setColour (juce::MidiKeyboardComponent::textLabelColourId, juce::Colours::transparentBlack);
@@ -454,8 +486,10 @@ PRA32ColorcoderAudioProcessorEditor::PRA32ColorcoderAudioProcessorEditor (
     addAndMakeVisible (saveButton);
     addAndMakeVisible (keyboardButton);
     addAndMakeVisible (keyboardComponent);
+    addAndMakeVisible (octaveDownButton);
+    addAndMakeVisible (octaveUpButton);
 
-    showPage (0);
+    showPage (startSection);
     updatePresetDisplay();
 
     setResizable (true, true);
@@ -465,10 +499,24 @@ PRA32ColorcoderAudioProcessorEditor::PRA32ColorcoderAudioProcessorEditor (
 
 PRA32ColorcoderAudioProcessorEditor::~PRA32ColorcoderAudioProcessorEditor()
 {
+    audioProcessor.removeChangeListener (this);
     setLookAndFeel (nullptr);
 }
 
 //==============================================================================
+void PRA32ColorcoderAudioProcessorEditor::changeListenerCallback (juce::ChangeBroadcaster*)
+{
+    updatePresetDisplay();
+    repaint();
+}
+
+void PRA32ColorcoderAudioProcessorEditor::storeUiState()
+{
+    audioProcessor.setUiProperty (uiKeyboardProperty, keyboardVisible);
+    audioProcessor.setUiProperty (uiOctaveProperty, keyboardBaseNote);
+    audioProcessor.setUiProperty (uiSectionProperty, sectionSelector.getActive());
+}
+
 void PRA32ColorcoderAudioProcessorEditor::showPage (int index)
 {
     index = juce::jlimit (0, pages.size() - 1, index);
@@ -477,29 +525,44 @@ void PRA32ColorcoderAudioProcessorEditor::showPage (int index)
         pages[i]->setVisible (i == index);
 
     sectionSelector.setActive (index, juce::dontSendNotification);
+    audioProcessor.setUiProperty (uiSectionProperty, index);
+}
+
+void PRA32ColorcoderAudioProcessorEditor::updateKeyboardRange()
+{
+    keyboardComponent.setAvailableRange (keyboardBaseNote, keyboardBaseNote + 60);
 }
 
 void PRA32ColorcoderAudioProcessorEditor::loadPreset (int index)
 {
-    presetIndex = ((index % 16) + 16) % 16;
-    audioProcessor.loadPreset (presetIndex);
+    audioProcessor.loadPreset (((index % 16) + 16) % 16);
     updatePresetDisplay();
 }
 
 void PRA32ColorcoderAudioProcessorEditor::updatePresetDisplay()
 {
-    presetDisplay.setText (juce::String::formatted ("%02d  %s", presetIndex, presetName (presetIndex)),
-                           "FACTORY PRESET");
+    const int current = audioProcessor.getCurrentFactoryPreset();
+
+    if (current >= 0)
+        presetDisplay.setText (juce::String::formatted ("%02d  ", current)
+                                   + PRA32ColorcoderAudioProcessor::factoryPresetName (current),
+                               "FACTORY PRESET");
+    else
+        presetDisplay.setText ("--  USER / SESSION", "LOADED PATCH");
+
     presetDisplay.setPrimaryFont (presetFont());
 }
 
 void PRA32ColorcoderAudioProcessorEditor::showPresetMenu()
 {
     juce::PopupMenu menu;
+    const int current = audioProcessor.getCurrentFactoryPreset();
 
     for (int i = 0; i < 16; ++i)
-        menu.addItem (i + 1, juce::String::formatted ("%02d  %s", i, presetName (i)),
-                      true, i == presetIndex);
+        menu.addItem (i + 1,
+                      juce::String::formatted ("%02d  ", i)
+                          + PRA32ColorcoderAudioProcessor::factoryPresetName (i),
+                      true, i == current);
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&presetDisplay),
                         [this] (int result)
@@ -623,12 +686,29 @@ void PRA32ColorcoderAudioProcessorEditor::resized()
 
         keyboardComponent.setVisible (true);
         keyboardComponent.setBounds (keyboardKeys);
+
+        // Octave shift lives on the keyboard plate header, left of the lamp.
+        auto strip = keyboardFrame.reduced (juce::roundToInt (sc (18.0f)),
+                                            juce::roundToInt (sc (6.0f)))
+                         .removeFromTop (juce::roundToInt (sc (14.0f)));
+        strip.removeFromRight (juce::roundToInt (sc (18.0f))); // lamp + gap
+
+        auto upArea = strip.removeFromRight (juce::roundToInt (sc (42.0f)));
+        strip.removeFromRight (juce::roundToInt (sc (4.0f)));
+        auto downArea = strip.removeFromRight (juce::roundToInt (sc (42.0f)));
+
+        octaveDownButton.setVisible (true);
+        octaveUpButton.setVisible (true);
+        octaveDownButton.setBounds (downArea.reduced (0, 1));
+        octaveUpButton.setBounds (upArea.reduced (0, 1));
     }
     else
     {
         keyboardFrame = {};
         keyboardKeys = {};
         keyboardComponent.setVisible (false);
+        octaveDownButton.setVisible (false);
+        octaveUpButton.setVisible (false);
     }
 
     // ---- Active page --------------------------------------------------------

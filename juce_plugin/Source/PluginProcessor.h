@@ -15,7 +15,8 @@ struct ParamBinding {
 };
 // -----------------------------------------------------------------------------
 
-class PRA32ColorcoderAudioProcessor  : public juce::AudioProcessor
+class PRA32ColorcoderAudioProcessor  : public juce::AudioProcessor,
+                                       public juce::ChangeBroadcaster
 {
 public:
     PRA32ColorcoderAudioProcessor();
@@ -56,6 +57,16 @@ public:
     void loadPresetFromJson(const juce::String& jsonString);
     juce::String savePresetToJson();
 
+    static const char* const factoryPresetNames[16];
+    static juce::String factoryPresetName (int index);
+
+    // -1 when the current patch came from a JSON file / host session.
+    int getCurrentFactoryPreset() const noexcept { return currentFactoryPreset; }
+
+    // Small non-parameter UI state persisted with the plugin state.
+    juce::var getUiProperty (const juce::Identifier& key) const;
+    void setUiProperty (const juce::Identifier& key, const juce::var& value);
+
 private:
     // -------------------------------------------------------------------------
     // Core Engine Instantiation
@@ -70,6 +81,8 @@ private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     
     std::vector<ParamBinding> paramBindings;
+
+    int currentFactoryPreset = 0;
 
     // Resampling state for the 48kHz engine
     double currentPhase = 0.0;
