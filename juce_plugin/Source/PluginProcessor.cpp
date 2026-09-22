@@ -88,51 +88,6 @@ static const char* factoryPresetsJson = R"(
 }
 )";
 
-static juce::String getPresetKeyForParam(const juce::String& paramId, const juce::String& paramLabel)
-{
-    if (paramId == "osc1Wave") return "OSC_1_WAVE";
-    if (paramId == "osc1Shape") return "OSC_1_SHAPE";
-    if (paramId == "osc1Morph") return "OSC_1_MORPH";
-    if (paramId == "osc2Wave") return "OSC_2_WAVE";
-    if (paramId == "osc2Coarse") return "OSC_2_COARSE";
-    if (paramId == "osc2Pitch") return "OSC_2_PITCH";
-    if (paramId == "oscMix") return "MIXER_OSC_MIX";
-    if (paramId == "subOsc") return "MIXER_SUB_OSC";
-    if (paramId == "oscDrift") return "OSC_DRIFT";
-    if (paramId == "sawWMode") return "OSC_SAW_W_MODE";
-    if (paramId == "filterCutoff") return "FILTER_CUTOFF";
-    if (paramId == "filterReso") return "FILTER_RESO";
-    if (paramId == "filterMode") return "FILTER_MODE";
-    if (paramId == "egFltAmt") return "FILTER_EG_AMT";
-    if (paramId == "filterKeyTrk") return "FILTER_KEY_TRK";
-    if (paramId == "bthFltAmt") return "BTH_FILTER_AMT";
-    if (paramId == "relEqDcy") return "REL_EQ_DECAY";
-    if (paramId == "egOscAmt") return "EG_OSC_AMT";
-    if (paramId == "egAttack") return "EG_ATTACK";
-    if (paramId == "egDecay") return "EG_DECAY";
-    if (paramId == "egSustain") return "EG_SUSTAIN";
-    if (paramId == "egRelease") return "EG_RELEASE";
-    if (paramId == "ampAttack") return "AMP_ATTACK";
-    if (paramId == "ampDecay") return "AMP_DECAY";
-    if (paramId == "ampSustain") return "AMP_SUSTAIN";
-    if (paramId == "ampRelease") return "AMP_RELEASE";
-    if (paramId == "lfoWave") return "LFO_WAVE";
-    if (paramId == "lfoRate") return "LFO_RATE";
-    if (paramId == "lfoFltAmt") return "LFO_FILTER_AMT";
-    if (paramId == "lfoOscAmt") return "LFO_OSC_AMT";
-    if (paramId == "lfoFadeTime") return "LFO_FADE_TIME";
-    if (paramId == "pbRange") return "P_BEND_RANGE";
-    if (paramId == "choRate") return "CHORUS_RATE";
-    if (paramId == "choDepth") return "CHORUS_DEPTH";
-    if (paramId == "delayTime") return "DELAY_TIME";
-    if (paramId == "delayDepth") return "DELAY_LEVEL";
-    if (paramId == "pan") return "PAN";
-    if (paramId == "ampGain") return "AMP_GAIN";
-    if (paramId == "portaTime") return "PORTAMENTO";
-    
-    return paramLabel.replace(" ", "_");
-}
-
 //==============================================================================
 PRA32ColorcoderAudioProcessor::PRA32ColorcoderAudioProcessor()
      : AudioProcessor (BusesProperties()
@@ -248,7 +203,7 @@ void PRA32ColorcoderAudioProcessor::loadPreset(int index)
     
     for (const auto& p : SynthParameters::getParameters())
     {
-        juce::String presetKey = getPresetKeyForParam(p.id, p.label);
+        juce::String presetKey = p.presetKey;
         
         juce::var paramVar;
         bool found = false;
@@ -284,7 +239,7 @@ void PRA32ColorcoderAudioProcessor::loadPresetFromJson(const juce::String& jsonS
     
     for (const auto& p : SynthParameters::getParameters())
     {
-        juce::String presetKey = getPresetKeyForParam(p.id, p.label);
+        juce::String presetKey = p.presetKey;
         
         juce::var paramVar;
         bool found = false;
@@ -327,7 +282,7 @@ juce::String PRA32ColorcoderAudioProcessor::savePresetToJson()
     
     for (const auto& p : SynthParameters::getParameters())
     {
-        juce::String presetKey = getPresetKeyForParam(p.id, p.label);
+        juce::String presetKey = p.presetKey;
         float currentVal = *apvts.getRawParameterValue(p.id);
         obj->setProperty(presetKey, (int)currentVal);
     }

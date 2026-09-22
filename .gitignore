@@ -31,3 +31,5 @@
 *.wav
 DigitalSynthVRA8U/build/*
 node_modules/
+
+juce_plugin/build/

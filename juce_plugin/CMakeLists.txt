@@ -35,6 +35,12 @@ target_sources(PRA32ColorcoderPlugin PRIVATE
     Source/PluginEditor.h
     Source/PRA32LookAndFeel.cpp
     Source/PRA32LookAndFeel.h
+    Source/PRA32Theme.cpp
+    Source/PRA32Theme.h
+    Source/PRA32ValueFormatter.cpp
+    Source/PRA32ValueFormatter.h
+    Source/PRA32Components.cpp
+    Source/PRA32Components.h
     Source/SynthParameters.cpp
     Source/SynthParameters.h
 )
