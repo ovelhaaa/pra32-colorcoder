@@ -197,25 +197,28 @@ double PRA32ColorcoderAudioProcessor::getTailLengthSeconds() const
 
 int PRA32ColorcoderAudioProcessor::getNumPrograms()
 {
-    return 1;
+    return 16;
 }
 
 int PRA32ColorcoderAudioProcessor::getCurrentProgram()
 {
-    return 0;
+    return juce::jmax (0, juce::jmin (15, currentFactoryPreset));
 }
 
 void PRA32ColorcoderAudioProcessor::setCurrentProgram (int index)
 {
+    if (index >= 0 && index < 16)
+        loadPreset (index);
 }
 
 const juce::String PRA32ColorcoderAudioProcessor::getProgramName (int index)
 {
-    return {};
+    return factoryPresetName (index);
 }
 
 void PRA32ColorcoderAudioProcessor::changeProgramName (int index, const juce::String& newName)
 {
+    juce::ignoreUnused (index, newName); // factory programs are read-only
 }
 
 void PRA32ColorcoderAudioProcessor::loadPreset(int index)
