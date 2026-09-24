@@ -10,6 +10,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 enable_testing()
 
+find_package(Threads REQUIRED)
+
 add_executable(pra32_param_logic_tests param_logic_tests.cpp)
 target_include_directories(pra32_param_logic_tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/../Source")
@@ -17,6 +19,7 @@ target_include_directories(pra32_param_logic_tests PRIVATE
 add_executable(pra32_midi_state_tests midi_state_tests.cpp)
 target_include_directories(pra32_midi_state_tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/../Source")
+target_link_libraries(pra32_midi_state_tests PRIVATE Threads::Threads)
 
 add_executable(pra32_engine_tests engine_tests.cpp)
 target_compile_definitions(pra32_engine_tests PRIVATE

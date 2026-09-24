@@ -33,6 +33,28 @@ public:
 
 #include "FactoryPresets.h"
 
+namespace
+{
+// Marks message-thread parameter writes as "self-inflicted" so the APVTS
+// listener does not record them as a GUI/host take-over. Only the message
+// thread performs these writes, but the flag is atomic because the listener can
+// also run on the audio thread when the host automates a parameter.
+struct DeferredWriteScope
+{
+    explicit DeferredWriteScope (std::atomic<bool>& flagToSet) : flag (flagToSet)
+    {
+        flag.store (true, std::memory_order_relaxed);
+    }
+
+    ~DeferredWriteScope()
+    {
+        flag.store (false, std::memory_order_relaxed);
+    }
+
+    std::atomic<bool>& flag;
+};
+} // namespace
+
 //==============================================================================
 const char* const PRA32ColorcoderAudioProcessor::factoryPresetNames[16] = {
     "INITIALIZATION", "SYNC LEAD", "SYNTH BRASS", "PLUCK SYNTH",
@@ -112,6 +134,12 @@ PRA32ColorcoderAudioProcessor::PRA32ColorcoderAudioProcessor()
     buildCcMap();
     capturePatchBaseline();
 
+    // Track GUI/host edits so they can win against a stale MIDI CC or a delayed
+    // preset mirror ("latest intentional event wins"). Our own writes are
+    // wrapped in DeferredWriteScope so they are not mistaken for host edits.
+    for (const auto& p : SynthParameters::getParameters())
+        apvts.addParameterListener (p.id, this);
+
     // Drains audio-thread MIDI requests into the APVTS on the message thread.
     startTimer (15);
 }
@@ -119,6 +147,9 @@ PRA32ColorcoderAudioProcessor::PRA32ColorcoderAudioProcessor()
 PRA32ColorcoderAudioProcessor::~PRA32ColorcoderAudioProcessor()
 {
     stopTimer();
+
+    for (const auto& p : SynthParameters::getParameters())
+        apvts.removeParameterListener (p.id, this);
 }
 
 void PRA32ColorcoderAudioProcessor::buildCcMap()
@@ -145,6 +176,31 @@ PRA32ColorcoderAudioProcessor::parameterForIndex (int index) const
         return nullptr;
 
     return apvts.getParameter (params[(size_t) index].id);
+}
+
+int PRA32ColorcoderAudioProcessor::indexForParameterId (const juce::String& parameterID) const
+{
+    const auto& params = SynthParameters::getParameters();
+
+    for (int i = 0; i < (int) params.size(); ++i)
+        if (params[(size_t) i].id == parameterID)
+            return i;
+
+    return -1;
+}
+
+void PRA32ColorcoderAudioProcessor::parameterChanged (const juce::String& parameterID, float)
+{
+    // Ignore the parameters this processor writes itself (preset mirror and
+    // deferred flush). Anything else is a GUI/host edit and is stamped with a
+    // fresh sequence so it beats every older MIDI/program event.
+    if (applyDeferredInProgress.load (std::memory_order_relaxed))
+        return;
+
+    const int index = indexForParameterId (parameterID);
+
+    if (index >= 0)
+        parameterMailbox.markHostChange (index, sequences.next());
 }
 
 //==============================================================================
@@ -241,7 +297,7 @@ void PRA32ColorcoderAudioProcessor::loadPreset(int index)
     // the APVTS/host/UI. The engine picks the new values up at the next block
     // through updateEngineFromParameters().
     discardPendingParameterUpdates();
-    pendingProgramChange.store (-1, std::memory_order_relaxed);
+    clearPendingProgram();
     mirrorProgramToAPVTSAndUI (index);
 }
 
@@ -287,7 +343,7 @@ void PRA32ColorcoderAudioProcessor::ensureFactoryPresetCache()
     factoryPresetCacheReady = true;
 }
 
-void PRA32ColorcoderAudioProcessor::mirrorProgramToAPVTSAndUI (int program)
+void PRA32ColorcoderAudioProcessor::writeProgramValuesToAPVTS (int program)
 {
     if (! PRA32MidiState::isValidFactoryProgram (program))
         return;
@@ -297,17 +353,47 @@ void PRA32ColorcoderAudioProcessor::mirrorProgramToAPVTSAndUI (int program)
     const auto& params = SynthParameters::getParameters();
 
     for (size_t i = 0; i < params.size() && i < factoryPresetValues.size(); ++i)
-    {
-        const int newValue = factoryPresetValues[i][(size_t) program];
-
         if (auto* param = apvts.getParameter (params[i].id))
-            param->setValueNotifyingHost (param->convertTo0to1 ((float) newValue));
-    }
+            param->setValueNotifyingHost (
+                param->convertTo0to1 ((float) factoryPresetValues[i][(size_t) program]));
+}
 
-    capturePatchBaseline();
+void PRA32ColorcoderAudioProcessor::captureBaselineFromProgram (int program)
+{
+    patchBaseline.clear();
+
+    if (! PRA32MidiState::isValidFactoryProgram (program))
+        return;
+
+    ensureFactoryPresetCache();
+
+    const auto& params = SynthParameters::getParameters();
+
+    for (size_t i = 0; i < params.size(); ++i)
+        patchBaseline.push_back (i < factoryPresetValues.size()
+                                     ? factoryPresetValues[i][(size_t) program]
+                                     : params[i].def);
+}
+
+void PRA32ColorcoderAudioProcessor::finishProgramBookkeeping (int program)
+{
+    // The baseline is the pure factory column, so any host/GUI value that won
+    // after the program change is correctly reported as an edit.
+    captureBaselineFromProgram (program);
     currentFactoryPreset = program;
     setUiProperty ("uiPreset", currentFactoryPreset);
     sendChangeMessage();
+}
+
+void PRA32ColorcoderAudioProcessor::mirrorProgramToAPVTSAndUI (int program)
+{
+    if (! PRA32MidiState::isValidFactoryProgram (program))
+        return;
+
+    const DeferredWriteScope scope (applyDeferredInProgress);
+
+    writeProgramValuesToAPVTS (program);
+    finishProgramBookkeeping (program);
 }
 
 void PRA32ColorcoderAudioProcessor::applyProgramToEngine (int program) noexcept
@@ -316,16 +402,36 @@ void PRA32ColorcoderAudioProcessor::applyProgramToEngine (int program) noexcept
     synthWrapper->synth.program_change ((uint8_t) program);
 }
 
+void PRA32ColorcoderAudioProcessor::queueProgramChange (int program) noexcept
+{
+    // Realtime path: stamp the deferred mirror with a fresh sequence.
+    pendingProgram.publish (program, sequences.next());
+}
+
+void PRA32ColorcoderAudioProcessor::clearPendingProgram() noexcept
+{
+    pendingProgram.clear();
+}
+
+void PRA32ColorcoderAudioProcessor::applyParameterValue (int index, int value)
+{
+    if (auto* param = parameterForIndex (index))
+        param->setValueNotifyingHost (
+            param->convertTo0to1 ((float) juce::jlimit (0, 127, value)));
+}
+
 void PRA32ColorcoderAudioProcessor::loadPresetFromJson(const juce::String& jsonString)
 {
     discardPendingParameterUpdates();
-    pendingProgramChange.store (-1, std::memory_order_relaxed);
+    clearPendingProgram();
 
     juce::var parsedJson = juce::JSON::parse(jsonString);
     if (!parsedJson.isObject()) return;
     
     auto* obj = parsedJson.getDynamicObject();
-    
+
+    const DeferredWriteScope scope (applyDeferredInProgress);
+
     for (const auto& p : SynthParameters::getParameters())
     {
         juce::String presetKey = p.presetKey;
@@ -499,6 +605,11 @@ void PRA32ColorcoderAudioProcessor::updateEngineFromParameters()
         {
             const int apvtsValue = (int) std::lround (val);
 
+            // A GUI/host edit recorded after the MIDI CC owns the parameter, so
+            // stop waiting for the APVTS to catch up with the stale MIDI value.
+            const bool hostTookOver =
+                parameterMailbox.hostSequence (i) > pb.midiSequence;
+
             if (apvtsValue == pb.midiTarget)
             {
                 // The APVTS caught up with the MIDI CC; adopt it and resume
@@ -506,14 +617,10 @@ void PRA32ColorcoderAudioProcessor::updateEngineFromParameters()
                 pb.midiPending = false;
                 pb.lastValue = val;
             }
-            else if (apvtsValue != (int) std::lround (pb.preMidiValue)
-                     || --pb.midiPendingBlocks <= 0)
+            else if (hostTookOver || --pb.midiPendingBlocks <= 0)
             {
                 // The user/host changed the value while the MIDI update was in
                 // flight, or the deferred write never landed; the APVTS wins.
-                // Invalidate the mailbox so no obsolete MIDI value can still be
-                // flushed over the newer change.
-                parameterMailbox.invalidate (i);
                 pb.midiPending = false;
                 pb.lastValue = val;
                 synthWrapper->synth.control_change (pb.cc, (uint8_t) juce::jlimit (0, 127, apvtsValue));
@@ -559,7 +666,7 @@ void PRA32ColorcoderAudioProcessor::handleMidiMessage (const juce::MidiMessage& 
             synthWrapper->synth.control_change ((uint8_t) controller, (uint8_t) value);
 
             if (PRA32MidiState::pcByCcTriggers (previousValue, value))
-                pendingProgramChange.store (pcByCcIndex, std::memory_order_relaxed);
+                queueProgramChange (pcByCcIndex);
 
             return;
         }
@@ -581,13 +688,19 @@ void PRA32ColorcoderAudioProcessor::handleMidiMessage (const juce::MidiMessage& 
                 if (! pb.midiPending)
                     pb.preMidiValue = pb.lastValue;
 
+                // Stamp this CC into the shared timeline. The message thread will
+                // only mirror it if no newer host/GUI or program event exists.
+                const auto sequence = sequences.next();
+
                 pb.midiPending = true;
                 pb.midiTarget = value;
                 pb.midiPendingBlocks = 20;
                 pb.lastValue = (float) value;
+                pb.midiSequence = sequence;
 
                 parameterMailbox.publish (parameterIndex, value,
-                                          (int) std::lround (pb.preMidiValue));
+                                          (int) std::lround (pb.preMidiValue),
+                                          sequence);
             }
         }
     }
@@ -616,7 +729,7 @@ void PRA32ColorcoderAudioProcessor::handleMidiMessage (const juce::MidiMessage& 
         if (PRA32MidiState::isValidFactoryProgram (program))
         {
             applyProgramToEngine (program);
-            pendingProgramChange.store (program, std::memory_order_relaxed);
+            queueProgramChange (program);
         }
     }
 }
@@ -628,31 +741,80 @@ void PRA32ColorcoderAudioProcessor::discardPendingParameterUpdates() noexcept
 
 void PRA32ColorcoderAudioProcessor::flushDeferredUpdates()
 {
-    const int program = pendingProgramChange.exchange (-1, std::memory_order_relaxed);
+    // Unified deferred timeline: a Program Change is a global event, a MIDI CC
+    // is a per-parameter event and a GUI/host edit is a per-parameter event.
+    // They all carry a sequence from the same generator, so for each parameter
+    // we simply apply the one with the highest sequence ("latest intentional
+    // event wins"). This is what lets "Program Change -> CC" keep the CC while
+    // "CC -> Program Change" lets the preset win.
+    const auto program = pendingProgram.peek();
+    const bool hasProgram = program.sequence != PRA32MidiState::kNoSequence
+                            && PRA32MidiState::isValidFactoryProgram (program.program);
 
-    if (PRA32MidiState::isValidFactoryProgram (program))
+    if (hasProgram)
+        ensureFactoryPresetCache();
+
+    const int count = (int) paramBindings.size();
+
     {
-        // A program change supersedes any in-flight CC write: the preset owns
-        // every parameter again.
-        discardPendingParameterUpdates();
-        mirrorProgramToAPVTSAndUI (program);
-        return;
+        const DeferredWriteScope scope (applyDeferredInProgress);
+
+        for (int i = 0; i < count; ++i)
+        {
+            auto& pb = paramBindings[(size_t) i];
+
+            const int currentValue = (pb.valuePtr != nullptr)
+                                         ? (int) std::lround (pb.valuePtr->load (std::memory_order_relaxed))
+                                         : -1;
+
+            const auto obs = parameterMailbox.observe (i);
+
+            const int programValue =
+                (hasProgram && i < (int) factoryPresetValues.size())
+                    ? factoryPresetValues[(size_t) i][(size_t) program.program]
+                    : -1;
+
+            const auto resolution = PRA32MidiState::resolveDeferredParameter (
+                obs, hasProgram ? program.sequence : PRA32MidiState::kNoSequence,
+                programValue);
+
+            if (resolution.source == PRA32MidiState::ParamEventSource::Midi)
+            {
+                // Remove exactly the publication we read; a newer publication
+                // survives the failed compare-exchange and is handled next tick.
+                if (parameterMailbox.tryConsume (i, obs))
+                {
+                    // A host/GUI edit may have raced in after we sampled its
+                    // watermark; re-check before overwriting the APVTS value.
+                    if (parameterMailbox.hostSequence (i) <= obs.sequence
+                        && currentValue != resolution.value)
+                    {
+                        applyParameterValue (i, resolution.value);
+                    }
+                }
+            }
+            else
+            {
+                // Host or Program wins: drop any stale MIDI publication.
+                if (resolution.shouldConsumeMidi)
+                    parameterMailbox.tryConsume (i, obs);
+
+                if (resolution.source == PRA32MidiState::ParamEventSource::Program
+                    && currentValue != resolution.value)
+                {
+                    applyParameterValue (i, resolution.value);
+                }
+            }
+        }
     }
 
-    for (int i = 0; i < (int) paramBindings.size(); ++i)
-    {
-        auto& pb = paramBindings[(size_t) i];
+    if (program.sequence != PRA32MidiState::kNoSequence && ! hasProgram)
+        pendingProgram.clearIfUnchanged (program);
 
-        const int currentValue = (pb.valuePtr != nullptr)
-                                     ? (int) std::lround (pb.valuePtr->load (std::memory_order_relaxed))
-                                     : -1;
-
-        int value = 0;
-
-        if (parameterMailbox.consume (i, currentValue, value))
-            if (auto* param = parameterForIndex (i))
-                param->setValueNotifyingHost (param->convertTo0to1 ((float) juce::jlimit (0, 127, value)));
-    }
+    // Only finish the bookkeeping if no newer Program Change was published while
+    // the mirror was in flight; otherwise leave it for the next tick.
+    if (hasProgram && pendingProgram.clearIfUnchanged (program))
+        finishProgramBookkeeping (program.program);
 }
 
 void PRA32ColorcoderAudioProcessor::timerCallback()
@@ -690,8 +852,13 @@ void PRA32ColorcoderAudioProcessor::setStateInformation (const void* data, int s
         if (xmlState->hasTagName (apvts.state.getType()))
         {
             discardPendingParameterUpdates();
-            pendingProgramChange.store (-1, std::memory_order_relaxed);
-            apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
+            clearPendingProgram();
+
+            {
+                const DeferredWriteScope scope (applyDeferredInProgress);
+                apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
+            }
+
             capturePatchBaseline();
 
             const auto presetVar = getUiProperty ("uiPreset");

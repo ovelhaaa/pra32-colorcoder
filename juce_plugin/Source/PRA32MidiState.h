@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <atomic>
 #include <cstdint>
@@ -10,12 +11,14 @@
 // keep MIDI, the parameter state and the engine coherent can be regression
 // tested without the plugin framework.
 //
-// Two concerns live here:
+// Three concerns live here:
 //   1. the tiny, pure rules that map MIDI Program Change / PC-by-CC to a preset
-//      index (mirroring the PRA32-U2 engine semantics exactly), and
-//   2. a realtime-safe mailbox that lets the audio thread hand a MIDI-CC value
-//      to the message thread without ever letting an obsolete value overwrite a
-//      newer GUI/host change.
+//      index (mirroring the PRA32-U2 engine semantics exactly),
+//   2. a single monotonic event sequence plus the pure "latest intentional event
+//      wins" rule shared by MIDI CC, Program Change and GUI/host edits, and
+//   3. realtime-safe mailboxes that let the audio thread hand work to the
+//      message thread without ever letting an obsolete value overwrite a newer
+//      change.
 // -----------------------------------------------------------------------------
 
 namespace PRA32MidiState
@@ -53,104 +56,257 @@ inline constexpr bool pcByCcTriggers (int previousValue, int newValue) noexcept
 }
 
 // -----------------------------------------------------------------------------
-// Realtime-safe mailbox for MIDI-CC-driven parameter writes.
+// Ordered deferred-event model.
+//
+// Every intentional event that can change parameter state -- a MIDI CC, a
+// Program Change, or a GUI/host edit -- is tagged with a strictly increasing
+// sequence number drawn from one monotonic counter. "Latest intentional event
+// wins" then reduces to a comparison, so no older operation can ever overwrite
+// a newer one.
+//
+// Memory model:
+//   * The generator uses a relaxed fetch_add: we only need uniqueness and
+//     monotonicity here, not ordering against unrelated memory.
+//   * Publishers write the payload with relaxed stores and then release-publish
+//     the sequence. Consumers acquire-read the sequence before touching the
+//     payload it protects. That release/acquire pair is the only synchronisation
+//     edge needed: no mutex, no allocation, no waiting, no spinning.
+// -----------------------------------------------------------------------------
+using Sequence = std::uint64_t;
+inline constexpr Sequence kNoSequence = 0;
+
+class SequenceGenerator
+{
+public:
+    Sequence next() noexcept
+    {
+        return counter.fetch_add (1, std::memory_order_relaxed) + 1;
+    }
+
+    Sequence peek() const noexcept
+    {
+        return counter.load (std::memory_order_relaxed);
+    }
+
+private:
+    std::atomic<Sequence> counter { 0 };
+};
+
+// The source that owns a parameter's final value.
+enum class ParamEventSource { None, Host, Midi, Program };
+
+// Resolves "latest intentional event wins" for a single parameter. A single
+// global generator makes the three candidates distinct, so a strict comparison
+// is total; kNoSequence means "no such event".
+inline ParamEventSource resolveParamEventSource (Sequence hostSequence,
+                                                 Sequence midiSequence,
+                                                 Sequence programSequence) noexcept
+{
+    const Sequence best = std::max ({ hostSequence, midiSequence, programSequence });
+
+    if (best == kNoSequence)     return ParamEventSource::None;
+    if (midiSequence == best)    return ParamEventSource::Midi;
+    if (programSequence == best) return ParamEventSource::Program;
+    return ParamEventSource::Host;
+}
+
+// -----------------------------------------------------------------------------
+// Single-slot, lock-free mailbox for MIDI-CC-driven parameter writes.
 //
 // The audio thread publishes the value it has just sent to the engine; the
-// message thread later mirrors it into the APVTS. A generation counter plus an
-// "invalidated" watermark guarantee "latest intentional change wins": once the
-// audio thread detects that the host/GUI took a parameter over, every older
-// MIDI value is rejected forever, so a stale mailbox entry can never overwrite
-// a newer host/GUI change. No allocation, no locks, no waits.
+// message thread later mirrors it into the APVTS. Consuming is a two-phase
+// operation: `observe()` samples the current publication, `tryConsume()` removes
+// it only if it is still *exactly* the observed generation. If the producer
+// republished in between, the compare-exchange fails and the newer publication
+// is left completely intact -- a consumer can never discard a value it did not
+// read.
+//
+// A per-parameter `hostSequence` watermark records the last GUI/host change. It
+// lives here so the ordering rule has all three candidates in one place.
 // -----------------------------------------------------------------------------
 class PendingParameterMailbox
 {
 public:
     static constexpr int kCapacity = 128;
 
+    struct Observation
+    {
+        bool     valid        = false;
+        int      value        = -1;
+        int      preValue     = -1;
+        Sequence sequence     = kNoSequence;
+        Sequence hostSequence = kNoSequence;
+    };
+
     void clearAll() noexcept
     {
         for (auto& e : entries)
         {
+            e.sequence.store (kNoSequence, std::memory_order_relaxed);
+            e.hostSequence.store (kNoSequence, std::memory_order_relaxed);
             e.value.store (-1, std::memory_order_relaxed);
             e.preValue.store (-1, std::memory_order_relaxed);
-            e.generation.store (0, std::memory_order_relaxed);
-            e.invalidated.store (0, std::memory_order_relaxed);
         }
     }
 
-    // Audio thread: remember a MIDI-CC value for `index`. `preValue` is the
-    // APVTS value from before the MIDI take-over.
-    void publish (int index, int value, int preValue) noexcept
+    // Producer (audio thread): payload first, then release-publish the sequence.
+    void publish (int index, int value, int preValue, Sequence sequence) noexcept
     {
         auto& e = entries[(size_t) index];
         e.preValue.store (preValue, std::memory_order_relaxed);
         e.value.store (value, std::memory_order_relaxed);
-        e.generation.fetch_add (1, std::memory_order_release);
+        e.sequence.store (sequence, std::memory_order_release);
     }
 
-    // Audio thread: the APVTS/host now owns `index`. Reject everything published
-    // so far; a later publish gets a newer generation and is accepted again.
-    void invalidate (int index) noexcept
+    // Producer (any thread): a GUI/host edit took `index` over.
+    void markHostChange (int index, Sequence sequence) noexcept
     {
-        auto& e = entries[(size_t) index];
-        e.invalidated.store (e.generation.load (std::memory_order_relaxed),
-                             std::memory_order_release);
+        entries[(size_t) index].hostSequence.store (sequence, std::memory_order_release);
     }
 
-    // Message thread: returns true and writes `outValue` when the pending MIDI
-    // value should be mirrored into the APVTS. `currentValue` is the live APVTS
-    // value; if it already moved away from both the pre-MIDI value and the MIDI
-    // value, someone else owns the parameter and the request is dropped.
-    bool consume (int index, int currentValue, int& outValue) noexcept
+    Sequence hostSequence (int index) const noexcept
     {
-        auto& e = entries[(size_t) index];
+        return entries[(size_t) index].hostSequence.load (std::memory_order_acquire);
+    }
 
-        const int value = e.value.load (std::memory_order_relaxed);
+    // Consumer (message thread): acquire-read the sequence before the payload.
+    Observation observe (int index) const noexcept
+    {
+        const auto& e = entries[(size_t) index];
 
-        if (value < 0)
-            return false;
+        Observation obs;
+        obs.hostSequence = e.hostSequence.load (std::memory_order_acquire);
+        obs.sequence     = e.sequence.load (std::memory_order_acquire);
 
-        const uint32_t generation = e.generation.load (std::memory_order_acquire);
-
-        if (generation == 0
-            || generation <= e.invalidated.load (std::memory_order_acquire))
+        if (obs.sequence != kNoSequence)
         {
-            clear (index);
-            return false;
+            obs.value    = e.value.load (std::memory_order_relaxed);
+            obs.preValue = e.preValue.load (std::memory_order_relaxed);
+            obs.valid    = obs.value >= 0;
         }
 
-        const int preValue = e.preValue.load (std::memory_order_relaxed);
-
-        if (currentValue != preValue && currentValue != value)
-        {
-            // GUI/host automation moved the parameter after the MIDI CC was
-            // queued; the newer change wins.
-            invalidate (index);
-            clear (index);
-            return false;
-        }
-
-        clear (index);
-        outValue = value;
-        return true;
+        return obs;
     }
 
-    void clear (int index) noexcept
+    // Consumer: remove exactly the observed publication. Returns false (and
+    // preserves the newer publication) if the producer republished since `obs`.
+    bool tryConsume (int index, const Observation& obs) noexcept
     {
-        entries[(size_t) index].value.store (-1, std::memory_order_relaxed);
+        if (! obs.valid || obs.sequence == kNoSequence)
+            return false;
+
+        auto& e = entries[(size_t) index];
+        Sequence expected = obs.sequence;
+
+        return e.sequence.compare_exchange_strong (expected, kNoSequence,
+                                                   std::memory_order_acq_rel,
+                                                   std::memory_order_acquire);
     }
 
 private:
     struct Entry
     {
-        std::atomic<int>      value       { -1 };
-        std::atomic<int>      preValue    { -1 };
-        std::atomic<uint32_t> generation  { 0 };
-        std::atomic<uint32_t> invalidated { 0 };
+        std::atomic<Sequence> sequence     { kNoSequence };
+        std::atomic<Sequence> hostSequence { kNoSequence };
+        std::atomic<int>      value        { -1 };
+        std::atomic<int>      preValue     { -1 };
     };
 
     std::array<Entry, (size_t) kCapacity> entries {};
 };
+
+// -----------------------------------------------------------------------------
+// Single-slot, lock-free Program Change mailbox. Only the most recent program
+// matters for the deferred APVTS/UI mirror: the engine has already applied every
+// intermediate program at its own sample. `clearIfUnchanged` refuses to remove a
+// slot that was republished while the mirror was in flight.
+// -----------------------------------------------------------------------------
+class PendingProgramSlot
+{
+public:
+    struct Snapshot
+    {
+        int      program  = -1;
+        Sequence sequence = kNoSequence;
+    };
+
+    void publish (int program, Sequence sequence) noexcept
+    {
+        value.store (program, std::memory_order_relaxed);
+        seq.store (sequence, std::memory_order_release);
+    }
+
+    Snapshot peek() const noexcept
+    {
+        Snapshot s;
+        s.sequence = seq.load (std::memory_order_acquire);
+        s.program  = value.load (std::memory_order_relaxed);
+        return s;
+    }
+
+    bool clearIfUnchanged (const Snapshot& snapshot) noexcept
+    {
+        if (snapshot.sequence == kNoSequence)
+            return false;
+
+        Sequence expected = snapshot.sequence;
+        return seq.compare_exchange_strong (expected, kNoSequence,
+                                            std::memory_order_acq_rel,
+                                            std::memory_order_acquire);
+    }
+
+    void clear() noexcept
+    {
+        seq.store (kNoSequence, std::memory_order_relaxed);
+        value.store (-1, std::memory_order_relaxed);
+    }
+
+private:
+    std::atomic<int>      value { -1 };
+    std::atomic<Sequence> seq   { kNoSequence };
+};
+
+// -----------------------------------------------------------------------------
+// The pure decision the message thread makes for one parameter. Kept here so the
+// processor and the regression tests share exactly the same rule:
+//   * MIDI wins      -> apply the MIDI value, drop its mailbox entry.
+//   * Program wins   -> apply the preset value, drop any stale MIDI entry.
+//   * Host wins      -> keep the APVTS value, drop any stale MIDI entry.
+// -----------------------------------------------------------------------------
+struct DeferredResolution
+{
+    ParamEventSource source            = ParamEventSource::None;
+    int              value             = -1;
+    bool             shouldConsumeMidi = false;
+    bool             shouldWriteValue  = false;
+};
+
+inline DeferredResolution resolveDeferredParameter (const PendingParameterMailbox::Observation& obs,
+                                                    Sequence programSequence,
+                                                    int programValue) noexcept
+{
+    DeferredResolution r;
+    r.source = resolveParamEventSource (obs.hostSequence, obs.sequence, programSequence);
+
+    if (r.source == ParamEventSource::Midi)
+    {
+        r.shouldConsumeMidi = true;
+        r.shouldWriteValue  = true;
+        r.value             = obs.value;
+    }
+    else if (r.source == ParamEventSource::Program)
+    {
+        r.shouldConsumeMidi = obs.valid;
+        r.shouldWriteValue  = true;
+        r.value             = programValue;
+    }
+    else
+    {
+        r.shouldConsumeMidi = obs.valid;
+    }
+
+    return r;
+}
 
 // -----------------------------------------------------------------------------
 // Sample-accurate MIDI dispatch (used by AudioProcessor::processBlock).

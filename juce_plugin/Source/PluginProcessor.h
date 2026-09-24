@@ -23,11 +23,13 @@ struct ParamBinding {
     int midiTarget = -1;
     float preMidiValue = -1.0f;
     int midiPendingBlocks = 0; // safety valve so an override can never stick forever
+    PRA32MidiState::Sequence midiSequence = PRA32MidiState::kNoSequence;
 };
 // -----------------------------------------------------------------------------
 
 class PRA32ColorcoderAudioProcessor  : public juce::AudioProcessor,
                                        public juce::ChangeBroadcaster,
+                                       private juce::AudioProcessorValueTreeState::Listener,
                                        private juce::Timer
 {
 public:
@@ -107,21 +109,48 @@ private:
     // MIDI-CC values waiting to be written back into the APVTS on the message
     // thread. The audio thread only publishes into this lock-free mailbox; the
     // message thread drains it, so no allocation or locking happens on the
-    // audio path. A generation watermark prevents an obsolete MIDI value from
-    // overwriting a newer GUI/host change.
+    // audio path. Each entry carries a sequence and a GUI/host watermark so an
+    // obsolete MIDI value can never overwrite a newer event.
     PRA32MidiState::PendingParameterMailbox parameterMailbox;
 
     // Last value seen on each PC-by-CC controller (CC112..119). Audio-thread
     // only; used to detect the engine's 0->1 program-change gate.
     std::array<int, 8> pcByCcValues {};
 
+    // Single monotonic source of event sequence numbers. MIDI CC, Program Change
+    // and GUI/host edits all draw from it so "latest intentional event wins" can
+    // be enforced with a plain comparison during the deferred flush.
+    PRA32MidiState::SequenceGenerator sequences;
+
     // Queued MIDI Program Change (from a real Program Change or a PC-by-CC
     // edge). The engine is already updated sample-accurately; this only drives
     // the deferred APVTS/UI/browser synchronization.
-    std::atomic<int> pendingProgramChange { -1 };
+    PRA32MidiState::PendingProgramSlot pendingProgram;
+
+    // Set while the message thread writes parameters itself (preset mirror or
+    // deferred flush) so the APVTS listener does not mistake our own writes for
+    // a GUI/host take-over.
+    std::atomic<bool> applyDeferredInProgress { false };
 
     juce::RangedAudioParameter* parameterForIndex (int index) const;
     void buildCcMap();
+    int indexForParameterId (const juce::String& parameterID) const;
+
+    // APVTS listener: records a GUI/host take-over sequence for a parameter.
+    void parameterChanged (const juce::String& parameterID, float newValue) override;
+
+    // Audio thread: stamp a Program Change into the deferred mailbox.
+    void queueProgramChange (int program) noexcept;
+    void clearPendingProgram() noexcept;
+
+    // Message thread: write one parameter through the APVTS and host.
+    void applyParameterValue (int index, int value);
+
+    // Message thread: apply every parameter of a factory program (user-initiated
+    // preset load) and finish the bookkeeping.
+    void writeProgramValuesToAPVTS (int program);
+    void captureBaselineFromProgram (int program);
+    void finishProgramBookkeeping (int program);
 
     void renderAudioRange (juce::AudioBuffer<float>& buffer, int startSample, int numSamples);
     void updateEngineFromParameters();
