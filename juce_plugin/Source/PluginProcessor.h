@@ -7,6 +7,7 @@ class PRA32Wrapper;
 
 #include "SynthParameters.h"
 #include "PRA32MidiState.h"
+#include "PRA32Resampler.h"
 #include <array>
 #include <atomic>
 #include <vector>
@@ -71,7 +72,7 @@ public:
     void loadPresetFromJson(const juce::String& jsonString);
     juce::String savePresetToJson();
 
-    static const char* const factoryPresetNames[16];
+    static const char* const factoryPresetNames[26];
     static juce::String factoryPresetName (int index);
 
     // -1 when the current patch came from a JSON file / host session.
@@ -181,11 +182,11 @@ private:
     std::vector<int> patchBaseline;
     void capturePatchBaseline();
 
-    // Resampling state for the 48kHz engine
-    double currentPhase = 0.0;
-    double phaseIncrement = 0.0;
-    float lastL = 0.0f, lastR = 0.0f;
-    float nextL = 0.0f, nextR = 0.0f;
+    // Output resampler. The PRA32 engine always runs at 48 kHz; this adapts its
+    // output to the host sample rate. At exactly 48 kHz it is a bit-transparent
+    // passthrough (no filtering, no phase accumulator). State is continuous
+    // across processBlock() calls.
+    pra32::Resampler resampler;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PRA32ColorcoderAudioProcessor)
 };

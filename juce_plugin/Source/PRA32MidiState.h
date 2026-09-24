@@ -25,11 +25,13 @@ namespace PRA32MidiState
 {
 
 // --- Program / preset mapping ------------------------------------------------
-// The wrapper exposes the engine's 16 factory programs (PROGRAM_NUMBER_MAX + 1).
-inline constexpr int kFactoryProgramCount = 16;
+// The wrapper exposes 26 factory presets (8 user + 18 factory). This is a
+// wrapper-level table: a preset is applied by writing every parameter to the
+// APVTS, so it is independent of the embedded engine's 16-program ROM table.
+inline constexpr int kFactoryProgramCount = 26;
 
-// Program numbers outside [0, 15] are invalid. The engine's program_change()
-// silently ignores them, so the wrapper must ignore (never clamp) them as well.
+// Program numbers outside [0, 25] are invalid. The wrapper must ignore (never
+// clamp) them, mirroring the engine's program_change() bounds.
 inline constexpr bool isValidFactoryProgram (int program) noexcept
 {
     return program >= 0 && program < kFactoryProgramCount;

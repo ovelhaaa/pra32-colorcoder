@@ -411,7 +411,10 @@ function setupControls(presetsLoaded) {
                 "00 · Initialization", "01 · Sync Lead", "02 · Synth Brass", "03 · Pluck Synth",
                 "04 · Mono Synth", "05 · Synth Bass 1", "06 · Synth Bass 2", "07 · Synth Bass 3",
                 "08 · Ethereal Pad", "09 · Gritty Bass", "10 · Chiptune Lead", "11 · Percussive Pluck",
-                "12 · Classic Sweep", "13 · Dark Drone", "14 · Noise Percussion", "15 · Bell Lead"
+                "12 · Classic Sweep", "13 · Dark Drone", "14 · Noise Percussion", "15 · Bell Lead",
+                "16 · Strings Ensemble", "17 · Electric Piano", "18 · Acid Bass", "19 · Warm Pad",
+                "20 · Horn Section", "21 · Music Box", "22 · Wobble Bass", "23 · Flute",
+                "24 · Glass Pad", "25 · Harpsichord"
             ];
 
             for (let i = 0; i < numPresets; i++) {

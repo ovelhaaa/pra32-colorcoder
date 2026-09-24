@@ -569,11 +569,13 @@ PRA32ColorcoderAudioProcessorEditor::PRA32ColorcoderAudioProcessorEditor (
 
     presetPrevButton.onClick = [this] ()
     {
-        loadPreset ((juce::jmax (0, audioProcessor.getCurrentFactoryPreset()) + 15) % 16);
+        const int count = audioProcessor.getNumPrograms();
+        loadPreset ((juce::jmax (0, audioProcessor.getCurrentFactoryPreset()) + count - 1) % count);
     };
     presetNextButton.onClick = [this] ()
     {
-        loadPreset ((juce::jmax (0, audioProcessor.getCurrentFactoryPreset()) + 1) % 16);
+        const int count = audioProcessor.getNumPrograms();
+        loadPreset ((juce::jmax (0, audioProcessor.getCurrentFactoryPreset()) + 1) % count);
     };
     presetDisplay.onClick   = [this] () { showPresetMenu(); };
 
@@ -741,7 +743,8 @@ void PRA32ColorcoderAudioProcessorEditor::updateKeyboardRange()
 
 void PRA32ColorcoderAudioProcessorEditor::loadPreset (int index)
 {
-    audioProcessor.loadPreset (((index % 16) + 16) % 16);
+    const int count = audioProcessor.getNumPrograms();
+    audioProcessor.loadPreset (((index % count) + count) % count);
     updatePresetDisplay();
 }
 
@@ -768,7 +771,7 @@ void PRA32ColorcoderAudioProcessorEditor::showPresetMenu()
     juce::PopupMenu menu;
     const int current = audioProcessor.getCurrentFactoryPreset();
 
-    for (int i = 0; i < 16; ++i)
+    for (int i = 0; i < audioProcessor.getNumPrograms(); ++i)
         menu.addItem (i + 1,
                       juce::String::formatted ("%02d  ", i)
                           + PRA32ColorcoderAudioProcessor::factoryPresetName (i),

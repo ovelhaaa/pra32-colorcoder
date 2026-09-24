@@ -2,7 +2,7 @@
 // PRA32-U2 MIDI state regression tests (Milestone A.1.1).
 //
 // JUCE-free tests for the MIDI -> engine / MIDI -> APVTS coherence rules:
-//   * Program Change validity (0..15 valid, >15 ignored, never clamped),
+//   * Program Change validity (0..25 valid, >=26 ignored, never clamped),
 //   * Program Change by CC (CC112..CC119) gate semantics,
 //   * the ordered deferred-event model ("latest intentional event wins") shared
 //     by Program Change, MIDI CC and GUI/host edits,
@@ -48,9 +48,10 @@ void testProgramValidity()
     CHECK (isValidFactoryProgram (0));
     CHECK (isValidFactoryProgram (1));
     CHECK (isValidFactoryProgram (15));
+    CHECK (isValidFactoryProgram (25));
 
-    // Must be ignored, never clamped to program 15.
-    CHECK (! isValidFactoryProgram (16));
+    // Must be ignored, never clamped to the last program.
+    CHECK (! isValidFactoryProgram (26));
     CHECK (! isValidFactoryProgram (42));
     CHECK (! isValidFactoryProgram (127));
     CHECK (! isValidFactoryProgram (-1));

@@ -56,16 +56,19 @@ struct DeferredWriteScope
 } // namespace
 
 //==============================================================================
-const char* const PRA32ColorcoderAudioProcessor::factoryPresetNames[16] = {
+const char* const PRA32ColorcoderAudioProcessor::factoryPresetNames[26] = {
     "INITIALIZATION", "SYNC LEAD", "SYNTH BRASS", "PLUCK SYNTH",
     "MONO SYNTH", "SYNTH BASS 1", "SYNTH BASS 2", "SYNTH BASS 3",
     "ETHEREAL PAD", "GRITTY BASS", "CHIPTUNE LEAD", "PERCUSSIVE PLUCK",
-    "CLASSIC SWEEP", "DARK DRONE", "NOISE PERCUSSION", "BELL LEAD"
+    "CLASSIC SWEEP", "DARK DRONE", "NOISE PERCUSSION", "BELL LEAD",
+    "STRINGS ENSEMBLE", "ELECTRIC PIANO", "ACID BASS", "WARM PAD",
+    "HORN SECTION", "MUSIC BOX", "WOBBLE BASS", "FLUTE",
+    "GLASS PAD", "HARPSICHORD"
 };
 
 juce::String PRA32ColorcoderAudioProcessor::factoryPresetName (int index)
 {
-    return (index >= 0 && index < 16) ? factoryPresetNames[index] : juce::String();
+    return (index >= 0 && index < 26) ? factoryPresetNames[index] : juce::String();
 }
 
 juce::var PRA32ColorcoderAudioProcessor::getUiProperty (const juce::Identifier& key) const
@@ -117,7 +120,7 @@ PRA32ColorcoderAudioProcessor::PRA32ColorcoderAudioProcessor()
     // Single authority for the startup state: factory preset 0 (INITIALIZATION).
     // The APVTS defaults are authored to match this column, so after
     // initialize() the engine, the APVTS and the UI all agree from the first
-    // sample. There is deliberately no transient program-15 state.
+    // sample. There is deliberately no transient last-program state.
     synthWrapper->synth.initialize();
     synthWrapper->synth.program_change(0);
 
@@ -258,22 +261,37 @@ bool PRA32ColorcoderAudioProcessor::isMidiEffect() const
 
 double PRA32ColorcoderAudioProcessor::getTailLengthSeconds() const
 {
-    return 0.0;
+    // The instrument keeps sounding after Note Off: the amp/EG release decays,
+    // the feedback delay repeats, and both can outlive a naive "0.0" report
+    // (which makes hosts cut audible tails and can break offline/freeze).
+    //
+    // Conservative bound derived from the engine's own limits at 48 kHz:
+    //   * delay: buffer 16384 samples, longest effective time ~16320 samples
+    //     (~0.34 s), max feedback coefficient 127/256 (~0.496). Reaching -60 dB
+    //     takes ~10 repeats -> ~3.4 s.
+    //   * envelope release: the steepest non-infinite release coefficient
+    //     (CC 126) has a ~2.5 s time constant -> ~17 s to -60 dB. CC 127 maps to
+    //     an exactly non-decaying coefficient (an intentional "hold"), which no
+    //     finite value can represent.
+    // 20 s covers the audible portion of every bounded setting with margin.
+    // This is intentionally a conservative constant rather than a hot-path
+    // computation: it is stable, allocation-free and cheap to query.
+    return 20.0;
 }
 
 int PRA32ColorcoderAudioProcessor::getNumPrograms()
 {
-    return 16;
+    return PRA32MidiState::kFactoryProgramCount;
 }
 
 int PRA32ColorcoderAudioProcessor::getCurrentProgram()
 {
-    return juce::jmax (0, juce::jmin (15, currentFactoryPreset));
+    return juce::jmax (0, juce::jmin (PRA32MidiState::kFactoryProgramCount - 1, currentFactoryPreset));
 }
 
 void PRA32ColorcoderAudioProcessor::setCurrentProgram (int index)
 {
-    if (index >= 0 && index < 16)
+    if (PRA32MidiState::isValidFactoryProgram (index))
         loadPreset (index);
 }
 
@@ -493,18 +511,22 @@ juce::String PRA32ColorcoderAudioProcessor::savePresetToJson()
 //==============================================================================
 void PRA32ColorcoderAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // The PRA32 engine operates at a fixed 48kHz.
-    // Calculate the phase increment for our linear interpolator resampler.
-    phaseIncrement = 48000.0 / sampleRate;
-    currentPhase = 1.0; // Force generating the first sample on first pass
-    lastL = 0.0f;
-    lastR = 0.0f;
-    nextL = 0.0f;
-    nextR = 0.0f;
+    juce::ignoreUnused (samplesPerBlock);
+
+    // The PRA32 engine operates at a fixed 48 kHz. The resampler adapts its
+    // output to the host rate and is a bit-transparent passthrough at 48 kHz.
+    // All filter/history memory is reserved here (never on the audio thread).
+    resampler.prepare (sampleRate);
+
+    // The resampler owns the samples it needs, so it adds no input/output
+    // latency: MIDI events land on the engine sample that maps to their host
+    // sample. Report that explicitly.
+    setLatencySamples (0);
 }
 
 void PRA32ColorcoderAudioProcessor::releaseResources()
 {
+    resampler.reset();
 }
 
 bool PRA32ColorcoderAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -559,32 +581,24 @@ void PRA32ColorcoderAudioProcessor::renderAudioRange (juce::AudioBuffer<float>& 
     float* channelDataL = buffer.getWritePointer (0);
     float* channelDataR = (totalNumOutputChannels > 1) ? buffer.getWritePointer (1) : nullptr;
 
+    // Pull one engine sample at the fixed 48 kHz engine rate. The resampler asks
+    // for as many as the current host ratio requires, so this lambda is only
+    // invoked when a new engine sample is actually needed.
+    auto pullEngineSample = [this]() -> pra32::Resampler::Sample
+    {
+        int16_t right_out = 0;
+        int16_t left_out = synthWrapper->synth.process (0, 0, right_out);
+        return { left_out / 32768.0f, right_out / 32768.0f };
+    };
+
     for (int i = 0; i < numSamples; ++i)
     {
-        // Fetch new samples from the 48kHz engine as needed.
-        while (currentPhase >= 1.0)
-        {
-            lastL = nextL;
-            lastR = nextR;
+        const auto out = resampler.process (pullEngineSample);
 
-            int16_t right_out = 0;
-            int16_t left_out = synthWrapper->synth.process (0, 0, right_out);
-
-            nextL = left_out / 32768.0f;
-            nextR = right_out / 32768.0f;
-
-            currentPhase -= 1.0;
-        }
-
-        const float outL = lastL + (nextL - lastL) * (float) currentPhase;
-        const float outR = lastR + (nextR - lastR) * (float) currentPhase;
-
-        channelDataL[startSample + i] = outL;
+        channelDataL[startSample + i] = out.l;
 
         if (channelDataR != nullptr)
-            channelDataR[startSample + i] = outR;
-
-        currentPhase += phaseIncrement;
+            channelDataR[startSample + i] = out.r;
     }
 }
 
@@ -725,7 +739,7 @@ void PRA32ColorcoderAudioProcessor::handleMidiMessage (const juce::MidiMessage& 
 
         // Sample-accurate: the engine switches at this exact event sample. The
         // APVTS/UI/host follow asynchronously through the deferred sync. Invalid
-        // programs (> 15) are ignored, matching the engine's program_change().
+        // programs (>= kFactoryProgramCount) are ignored.
         if (PRA32MidiState::isValidFactoryProgram (program))
         {
             applyProgramToEngine (program);
