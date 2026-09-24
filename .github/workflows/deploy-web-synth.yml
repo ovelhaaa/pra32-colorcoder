@@ -27,7 +27,7 @@ jobs:
       - name: Compile WASM Wrapper
         run: |
           cd web_app
-          emcc wasm_wrapper.cpp -I../Digital-Synth-PRA32-U2 -I. -O3 --no-entry -s STANDALONE_WASM=1 -s EXPORTED_FUNCTIONS="['_initSynth', '_processAudioBlock', '_noteOn', '_noteOff', '_controlChange', '_getLeftBuffer', '_getRightBuffer']" -o synth.wasm
+          emcc wasm_wrapper.cpp -I../Digital-Synth-PRA32-U2 -I. -O3 -DPRA32_U2_ENABLE_POLY_ON_1_CORE=1 --no-entry -s STANDALONE_WASM=1 -s EXPORTED_FUNCTIONS="['_initSynth', '_processAudioBlock', '_noteOn', '_noteOff', '_controlChange', '_getLeftBuffer', '_getRightBuffer']" -o synth.wasm
 
       - name: Prepare dist folder
         run: |

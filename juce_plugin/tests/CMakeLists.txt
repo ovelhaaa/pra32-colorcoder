@@ -14,6 +14,10 @@ add_executable(pra32_param_logic_tests param_logic_tests.cpp)
 target_include_directories(pra32_param_logic_tests PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/../Source")
 
+add_executable(pra32_midi_state_tests midi_state_tests.cpp)
+target_include_directories(pra32_midi_state_tests PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../Source")
+
 add_executable(pra32_engine_tests engine_tests.cpp)
 target_compile_definitions(pra32_engine_tests PRIVATE
     PRA32_U2_ENABLE_POLY_ON_1_CORE=1
@@ -27,7 +31,9 @@ if (MSVC)
 else()
     target_compile_options(pra32_engine_tests PRIVATE -Wall -Wextra)
     target_compile_options(pra32_param_logic_tests PRIVATE -Wall -Wextra)
+    target_compile_options(pra32_midi_state_tests PRIVATE -Wall -Wextra)
 endif()
 
 add_test(NAME param_logic COMMAND pra32_param_logic_tests)
+add_test(NAME midi_state  COMMAND pra32_midi_state_tests)
 add_test(NAME engine      COMMAND pra32_engine_tests)

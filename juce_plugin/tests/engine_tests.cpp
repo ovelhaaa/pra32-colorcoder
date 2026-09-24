@@ -203,14 +203,63 @@ void testProgramChange()
     CHECK (s->current_controller_value (PORTAMENTO) == 48);
     CHECK (s->current_controller_value (OSC_2_PITCH) == 72);
 
+    // Valid program 1 loads its own column from the table.
+    s->program_change (1);
+    CHECK (s->current_controller_value (OSC_1_MORPH) == 127);
+
     s->program_change (15);
     CHECK (s->current_controller_value (VOICE_MODE) == 127);
     CHECK (s->current_controller_value (FILTER_CUTOFF) == 127);
+
+    // Invalid programs (> 15) must be ignored, never clamped to program 15.
+    s->program_change (0);
+    CHECK (s->current_controller_value (FILTER_CUTOFF) == 112);
+    CHECK (s->current_controller_value (VOICE_MODE) == 0);
+
+    s->program_change (16);
+    CHECK (s->current_controller_value (FILTER_CUTOFF) == 112);
+    CHECK (s->current_controller_value (VOICE_MODE) == 0);
+
+    s->program_change (42);
+    CHECK (s->current_controller_value (FILTER_CUTOFF) == 112);
+    CHECK (s->current_controller_value (VOICE_MODE) == 0);
+
+    s->program_change (127);
+    CHECK (s->current_controller_value (FILTER_CUTOFF) == 112);
+    CHECK (s->current_controller_value (VOICE_MODE) == 0);
 
     // The wrapper must start on program 0 (INITIALIZATION), never program 15.
     auto startup = makeSynth();
     CHECK (startup->current_controller_value (VOICE_MODE) == 0);
     CHECK (startup->current_controller_value (FILTER_CUTOFF) == 112);
+}
+
+void testProgramChangeByCc()
+{
+    std::printf ("program change by CC...\n");
+
+    auto s = makeSynth();
+    s->program_change (0);
+
+    // CC116 (PC_BY_CC_4) low then high selects program 4 (VOICE_MODE = 127).
+    s->control_change (PC_BY_CC_4, 0);
+    CHECK (s->current_controller_value (VOICE_MODE) == 0);
+
+    s->control_change (PC_BY_CC_4, 127);
+    CHECK (s->current_controller_value (VOICE_MODE) == 127);
+
+    // Perturb the parameter away from the preset.
+    s->control_change (VOICE_MODE, 0);
+    CHECK (s->current_controller_value (VOICE_MODE) == 0);
+
+    // Re-sending the same high value (127 -> 127) must NOT re-trigger.
+    s->control_change (PC_BY_CC_4, 127);
+    CHECK (s->current_controller_value (VOICE_MODE) == 0);
+
+    // ...but going low then high triggers again.
+    s->control_change (PC_BY_CC_4, 0);
+    s->control_change (PC_BY_CC_4, 127);
+    CHECK (s->current_controller_value (VOICE_MODE) == 127);
 }
 
 void testPitchBend()
@@ -306,6 +355,7 @@ int main()
     testSustain();
     testVoiceModes();
     testProgramChange();
+    testProgramChangeByCc();
     testPitchBend();
     testAftertouch();
     testMonoCoreIsPoly();

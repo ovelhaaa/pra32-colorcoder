@@ -6,6 +6,7 @@
 class PRA32Wrapper;
 
 #include "SynthParameters.h"
+#include "PRA32MidiState.h"
 #include <array>
 #include <atomic>
 #include <vector>
@@ -104,11 +105,19 @@ private:
     std::array<int, 128> ccToParamIndex {};
 
     // MIDI-CC values waiting to be written back into the APVTS on the message
-    // thread. -1 means "nothing pending". The audio thread only stores integers;
-    // the message thread drains them, so no allocation or locking happens on the
-    // audio path.
-    static constexpr int kMaxParameters = 128;
-    std::array<std::atomic<int>, kMaxParameters> pendingParameterValue {};
+    // thread. The audio thread only publishes into this lock-free mailbox; the
+    // message thread drains it, so no allocation or locking happens on the
+    // audio path. A generation watermark prevents an obsolete MIDI value from
+    // overwriting a newer GUI/host change.
+    PRA32MidiState::PendingParameterMailbox parameterMailbox;
+
+    // Last value seen on each PC-by-CC controller (CC112..119). Audio-thread
+    // only; used to detect the engine's 0->1 program-change gate.
+    std::array<int, 8> pcByCcValues {};
+
+    // Queued MIDI Program Change (from a real Program Change or a PC-by-CC
+    // edge). The engine is already updated sample-accurately; this only drives
+    // the deferred APVTS/UI/browser synchronization.
     std::atomic<int> pendingProgramChange { -1 };
 
     juce::RangedAudioParameter* parameterForIndex (int index) const;
@@ -117,6 +126,21 @@ private:
     void renderAudioRange (juce::AudioBuffer<float>& buffer, int startSample, int numSamples);
     void updateEngineFromParameters();
     void handleMidiMessage (const juce::MidiMessage& msg);
+
+    // --- Preset pipeline -----------------------------------------------------
+    // Realtime path: mutate the engine only. No allocation, safe on the audio
+    // thread (used for sample-accurate MIDI Program Change).
+    void applyProgramToEngine (int program) noexcept;
+
+    // Message-thread path: mirror a preset onto the APVTS, the host, the preset
+    // browser and the modified-state bookkeeping.
+    void mirrorProgramToAPVTSAndUI (int program);
+
+    // Lazily parses FactoryPresets::json() once into a [param][program] table so
+    // a program sync no longer re-parses JSON on every change.
+    void ensureFactoryPresetCache();
+    std::vector<std::array<int, PRA32MidiState::kFactoryProgramCount>> factoryPresetValues;
+    bool factoryPresetCacheReady = false;
 
     void timerCallback() override;
 

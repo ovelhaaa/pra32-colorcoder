@@ -15,10 +15,13 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Configure CMake
-      run: cmake -S juce_plugin -B juce_plugin/build -DCMAKE_BUILD_TYPE=Release
+      run: cmake -S juce_plugin -B juce_plugin/build -DCMAKE_BUILD_TYPE=Release -DPRA32_BUILD_TESTS=ON
 
     - name: Build
-      run: cmake --build juce_plugin/build --config Release --target PRA32ColorcoderPlugin_Standalone PRA32ColorcoderPlugin_VST3 -j 4
+      run: cmake --build juce_plugin/build --config Release --target PRA32ColorcoderPlugin_Standalone PRA32ColorcoderPlugin_VST3 pra32_param_logic_tests pra32_midi_state_tests pra32_engine_tests -j 4
+
+    - name: Run regression tests
+      run: ctest --test-dir juce_plugin/build -C Release --output-on-failure
 
     - name: Upload VST3 Artifact
       uses: actions/upload-artifact@v4

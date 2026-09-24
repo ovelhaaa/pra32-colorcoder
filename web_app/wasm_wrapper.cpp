@@ -13,6 +13,13 @@ void digitalWrite(uint8_t pin, uint8_t val) {}
 #define PRA32_U2_USE_EMULATED_EEPROM 1
 //#define PRA32_U2_USE_PWM_AUDIO_INSTEAD_OF_I2S 0
 
+// The browser has a single audio thread, so enable the single-core polyphonic
+// path (4 voices) to match the VST3 / Standalone builds. The GitHub Actions
+// build also passes this as -D; the guard keeps local emcc builds consistent.
+#ifndef PRA32_U2_ENABLE_POLY_ON_1_CORE
+#define PRA32_U2_ENABLE_POLY_ON_1_CORE 1
+#endif
+
 #include "pra32-u2-synth.h"
 #include <emscripten.h>
 
