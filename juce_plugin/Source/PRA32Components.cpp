@@ -175,34 +175,14 @@ int bandCount (const juce::StringArray& labels)
     return juce::jmax (2, labels.size());
 }
 
-int bandIndexFor (const juce::StringArray& labels, int value)
+int bandIndexFor (const SynthParamData& param, int value)
 {
-    const int n = bandCount (labels);
-
-    if (n == 2) return value < 64 ? 0 : 1;
-    if (n == 3) return value < 32 ? 0 : (value < 96 ? 1 : 2);
-    if (n == 6)
-        return value < 13 ? 0 : (value < 39 ? 1 : (value < 64 ? 2
-               : (value < 89 ? 3 : (value < 115 ? 4 : 5))));
-
-    return juce::jlimit (0, n - 1, (value * n) / 128);
+    return SynthParameters::enumIndex (param, value);
 }
 
-int bandRepresentative (const juce::StringArray& labels, int index)
+int bandRepresentative (const SynthParamData& param, int index)
 {
-    const int n = bandCount (labels);
-    index = juce::jlimit (0, n - 1, index);
-
-    if (n == 2) return index == 0 ? 0 : 127;
-    if (n == 3) return index == 0 ? 0 : (index == 1 ? 64 : 127);
-
-    if (n == 6)
-    {
-        static const int values[6] = { 6, 25, 51, 76, 101, 121 };
-        return values[index];
-    }
-
-    return juce::jlimit (0, 127, (int) std::round ((index + 0.5) * 128.0 / n));
+    return SynthParameters::enumRepresentative (param, index);
 }
 
 } // namespace
@@ -331,7 +311,7 @@ void SteppedSelector::selectFromPoint (juce::Point<int> position)
     const int row = juce::jlimit (0, rows - 1, (int) std::floor ((position.y - inner.getY()) / segH));
     const int index = juce::jlimit (0, n - 1, row * cols + col);
 
-    setValue (bandRepresentative (param.enumLabels, index), juce::sendNotificationSync);
+    setValue (bandRepresentative (param, index), juce::sendNotificationSync);
 }
 
 void SteppedSelector::mouseDown (const juce::MouseEvent& e) { selectFromPoint (e.getPosition()); }
@@ -346,7 +326,7 @@ void SteppedSelector::paint (juce::Graphics& g)
     const auto accent = sectionAccent (param.section);
     const int n = bandCount (param.enumLabels);
     const int v = (int) std::lround (getValue());
-    const int active = bandIndexFor (param.enumLabels, v);
+    const int active = bandIndexFor (param, v);
     const int cols = gridColumnsFor (n);
     const int rows = (n + cols - 1) / cols;
 

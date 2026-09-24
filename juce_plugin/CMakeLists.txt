@@ -41,6 +41,8 @@ target_sources(PRA32ColorcoderPlugin PRIVATE
     Source/PRA32ValueFormatter.h
     Source/PRA32Components.cpp
     Source/PRA32Components.h
+    Source/PRA32ParamLogic.h
+    Source/FactoryPresets.h
     Source/SynthParameters.cpp
     Source/SynthParameters.h
 )
@@ -66,3 +68,16 @@ target_compile_features(PRA32ColorcoderPlugin PUBLIC cxx_std_20)
 
 # Forcefully disable VST2 compatibility in VST3 (fixes missing vstfxstore.h)
 target_compile_definitions(PRA32ColorcoderPlugin PUBLIC JUCE_VST3_CAN_REPLACE_VST2=0)
+
+# The PRA32-U2 engine only renders the extra voices when one of its polyphony
+# modes is compiled in. On desktop there is a single audio thread, so enable the
+# single-core polyphonic path (4 voices). Without this the synth is monophonic
+# regardless of the VOICE_MODE parameter.
+target_compile_definitions(PRA32ColorcoderPlugin PRIVATE PRA32_U2_ENABLE_POLY_ON_1_CORE=1)
+
+# Standalone, JUCE-free regression tests (engine + parameter logic).
+option(PRA32_BUILD_TESTS "Build the standalone PRA32 wrapper tests" OFF)
+if(PRA32_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

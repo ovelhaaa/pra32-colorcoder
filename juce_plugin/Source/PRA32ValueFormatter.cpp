@@ -26,23 +26,6 @@ double interpExp (const Anchor* a, int count, double x)
     return a[count - 1].y;
 }
 
-double lerp (const Anchor* a, int count, double x)
-{
-    if (x <= a[0].x)     return a[0].y;
-    if (x >= a[count - 1].x) return a[count - 1].y;
-
-    for (int i = 0; i < count - 1; ++i)
-    {
-        if (x <= a[i + 1].x)
-        {
-            const double t = (x - a[i].x) / (a[i + 1].x - a[i].x);
-            return a[i].y + t * (a[i + 1].y - a[i].y);
-        }
-    }
-
-    return a[count - 1].y;
-}
-
 juce::String signedInt (int v)
 {
     return v > 0 ? "+" + juce::String (v) : juce::String (v);
@@ -124,24 +107,23 @@ const int delayTimeTable[128] = {
 
 juce::String formatPitchMod (int v)
 {
-    static const Anchor centsAnchors[] = {
-        { 1, -12000 }, { 2, -9600 }, { 3, -7200 }, { 4, -6000 }, { 5, -4800 },
-        { 6, -4200 }, { 7, -3600 }, { 8, -3000 }, { 9, -2400 }, { 21, -1200 },
-        { 31, -200 }, { 32, -100 }, { 64, 0 }, { 96, 100 }, { 97, 200 },
-        { 107, 1200 }, { 119, 2400 }, { 120, 3000 }, { 121, 3600 }, { 122, 4200 },
-        { 123, 4800 }, { 124, 6000 }, { 125, 7200 }, { 126, 9600 }, { 127, 12000 }
-    };
+    using PRA32ParamLogic::PitchModDisplay;
 
-    const double cents = lerp (centsAnchors, (int) (sizeof (centsAnchors) / sizeof (centsAnchors[0])), v);
-    const double st = cents / 100.0;
+    const auto display = PRA32ParamLogic::classifyPitchMod (v);
 
-    if (std::abs (st) < 100.0)
-        return signedInt ((int) std::round (cents)) + " ct";
+    switch (display.unit)
+    {
+        case PitchModDisplay::Unit::cents:
+            return signedInt ((int) std::round (display.amount)) + " ct";
 
-    if (std::abs (st) < 100.0 * 12.0)
-        return juce::String (st >= 0 ? "+" : "") + juce::String (st, 2) + " st";
+        case PitchModDisplay::Unit::semitones:
+            return juce::String (display.amount >= 0 ? "+" : "") + juce::String (display.amount, 2) + " st";
 
-    return juce::String (st >= 0 ? "+" : "") + juce::String (st / 12.0, 2) + " oct";
+        case PitchModDisplay::Unit::octaves:
+            return juce::String (display.amount >= 0 ? "+" : "") + juce::String (display.amount, 2) + " oct";
+    }
+
+    return juce::String (v);
 }
 
 juce::String enumLabel (const SynthParamData& p, int v)
@@ -151,16 +133,7 @@ juce::String enumLabel (const SynthParamData& p, int v)
     if (n == 0)
         return juce::String (v);
 
-    // Band boundaries mirror the engine's parameter interpretation:
-    //   2 states  -> 0-63 / 64-127
-    //   3 states  -> 0-31 / 32-95 / 96-127
-    //   6 states  -> 13 / 39 / 64 / 89 / 115 thresholds
-    int index = 0;
-
-    if (n == 2)      index = v < 64 ? 0 : 1;
-    else if (n == 3) index = v < 32 ? 0 : (v < 96 ? 1 : 2);
-    else if (n == 6) index = v < 13 ? 0 : (v < 39 ? 1 : (v < 64 ? 2 : (v < 89 ? 3 : (v < 115 ? 4 : 5))));
-    else             index = juce::jlimit (0, n - 1, (v * n) / 128);
+    const int index = SynthParameters::enumIndex (p, v);
 
     return p.enumLabels[juce::jlimit (0, n - 1, index)];
 }

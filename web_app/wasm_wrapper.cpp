@@ -16,7 +16,7 @@ void digitalWrite(uint8_t pin, uint8_t val) {}
 #include "pra32-u2-synth.h"
 #include <emscripten.h>
 
-PRA32_U2_Synth<false, false, false, 4> synth;
+PRA32_U2_Synth<false, false, false, 0> synth;
 
 const int BLOCK_SIZE = 4096;
 int16_t outputBufferLeft[BLOCK_SIZE];
@@ -27,7 +27,7 @@ extern "C" {
 EMSCRIPTEN_KEEPALIVE
 void initSynth() {
     synth.initialize();
-    synth.program_change(15); // Load Initial preset
+    synth.program_change(0); // Program 0 == INITIALIZATION
 }
 
 EMSCRIPTEN_KEEPALIVE

@@ -3,6 +3,7 @@
 #include <JuceHeader.h>
 #include <vector>
 #include <string>
+#include "PRA32ParamLogic.h"
 
 // -----------------------------------------------------------------------------
 // Control kinds / display formats are presentation-only metadata. They never
@@ -66,6 +67,16 @@ class SynthParameters {
 public:
     static const std::vector<SynthParamData>& getParameters();
     static const SynthParamData* find(const juce::String& id);
+
+    // --- Enum metadata -------------------------------------------------------
+    // The engine interprets several stepped selectors as non-uniform CC bands.
+    // These helpers are the single source of truth for the mapping between a
+    // raw 0..127 value, the displayed choice index, and the representative CC
+    // value that the UI writes back. Params without explicit ranges fall back
+    // to the generic uniform banding used by simple 2/3-state selectors.
+    static const PRA32ParamLogic::EnumRange* enumRanges (const SynthParamData& p, int& count);
+    static int enumIndex (const SynthParamData& p, int value);
+    static int enumRepresentative (const SynthParamData& p, int index);
 
     // CC values come from the engine constants (pra32-u2-constants.h).
     enum Cc {

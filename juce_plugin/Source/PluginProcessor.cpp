@@ -25,70 +25,13 @@ uint8_t g_midi_ch = 0;
 
 class PRA32Wrapper {
 public:
-    PRA32_U2_Synth<false, false, false, 4> synth;
+    // The fourth template argument is SYNTH_ID, not a voice count. Voice count
+    // comes from PRA32_U2_ENABLE_POLY_ON_1_CORE (set in CMakeLists.txt).
+    PRA32_U2_Synth<false, false, false, 0> synth;
 };
 // -----------------------------------------------------------------------------
 
-//==============================================================================
-static const char* factoryPresetsJson = R"(
-{
-  "_version       " : "PRA32-U2 Editor v2.12.0",
-  "_comment       " : "Current  #0   #1   #2   #3   #4   #5   #6   #7     #8   #9   #10  #11  #12  #13  #14  #15  ",
-  "OSC_1_WAVE     " : [ [0], [0  , 0  , 76 , 127, 0  , 25 , 0  , 0  , 76 , 0  , 25 , 0  , 0  , 25 , 127, 76 ] ],
-  "MIXER_SUB_OSC  " : [ [64], [64 , 64 , 64 , 64 , 127, 96 , 127, 64 , 64 , 127, 64 , 64 , 64 , 64 , 1  , 64 ] ],
-  "OSC_1_SHAPE    " : [ [64], [64 , 64 , 0  , 0  , 64 , 64 , 0  , 0  , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 100] ],
-  "OSC_1_MORPH    " : [ [0], [0  , 127, 108, 64 , 0  , 127, 0  , 0  , 0  , 0  , 64 , 0  , 0  , 0  , 0  , 0  ] ],
-  "OSC_2_WAVE     " : [ [0], [0  , 0  , 0  , 0  , 0  , 25 , 0  , 0  , 76 , 0  , 25 , 0  , 0  , 25 , 0  , 76 ] ],
-  "MIXER_OSC_MIX  " : [ [64], [64 , 0  , 64 , 0  , 64 , 0  , 64 , 0  , 64 , 64 , 64 , 127, 64 , 64 , 0  , 64 ] ],
-  "OSC_2_COARSE   " : [ [64], [64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 52 , 64 , 88 ] ],
-  "OSC_2_PITCH    " : [ [72], [72 , 72 , 72 , 72 , 66 , 72 , 66 , 64 , 72 , 72 , 72 , 72 , 59 , 72 , 72 , 72 ] ],
-  "FILTER_CUTOFF  " : [ [112], [112, 112, 88 , 127, 88 , 112, 40 , 127, 90 , 80 , 127, 60 , 40 , 30 , 100, 127] ],
-  "FILTER_RESO    " : [ [48], [48 , 48 , 48 , 48 , 48 , 48 , 80 , 0  , 30 , 80 , 48 , 48 , 90 , 40 , 0  , 48 ] ],
-  "FILTER_EG_AMT  " : [ [40], [40 , 64 , 64 , 64 , 76 , 64 , 88 , 64 , 64 , 100, 40 , 110, 100, 64 , 40 , 40 ] ],
-  "FILTER_KEY_TRK " : [ [96], [96 , 96 , 96 , 96 , 64 , 64 , 64 , 64 , 96 , 96 , 96 , 96 , 96 , 96 , 96 , 96 ] ],
-  "EG_ATTACK      " : [ [96], [96 , 32 , 32 , 32 , 32 , 32 , 32 , 0  , 110, 0  , 96 , 0  , 80 , 96 , 96 , 96 ] ],
-  "EG_DECAY       " : [ [96], [96 , 32 , 96 , 32 , 32 , 96 , 100, 0  , 96 , 40 , 96 , 50 , 60 , 96 , 96 , 96 ] ],
-  "EG_SUSTAIN     " : [ [0], [0  , 127, 0  , 127, 127, 0  , 0  , 127, 0  , 20 , 0  , 0  , 64 , 64 , 0  , 0  ] ],
-  "EG_RELEASE     " : [ [32], [32 , 32 , 32 , 32 , 32 , 32 , 32 , 0  , 110, 32 , 32 , 32 , 32 , 32 , 32 , 32 ] ],
-  "EG_OSC_AMT     " : [ [64], [64 , 64 , 72 , 64 , 64 , 72 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 ] ],
-  "EG_OSC_DST     " : [ [0], [0  , 0  , 127, 0  , 0  , 127, 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
-  "VOICE_MODE     " : [ [0], [0  , 0  , 0  , 0  , 127, 76 , 76 , 127, 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
-  "PORTAMENTO     " : [ [48], [48 , 0  , 0  , 0  , 48 , 48 , 0  , 0  , 48 , 48 , 48 , 48 , 48 , 48 , 48 , 48 ] ],
-  "LFO_WAVE       " : [ [0], [0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
-  "LFO_FADE_TIME  " : [ [0], [0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
-  "LFO_RATE       " : [ [80], [80 , 80 , 80 , 80 , 80 , 80 , 80 , 80 , 80 , 80 , 100, 80 , 80 , 80 , 80 , 80 ] ],
-  "LFO_DEPTH      " : [ [0], [0  , 0  , 0  , 127, 8  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
-  "LFO_OSC_AMT    " : [ [64], [64 , 64 , 64 , 64 , 96 , 72 , 64 , 64 , 64 , 64 , 90 , 64 , 64 , 64 , 64 , 64 ] ],
-  "LFO_OSC_DST    " : [ [0], [0  , 0  , 127, 0  , 0  , 127, 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
-  "LFO_FILTER_AMT " : [ [76], [76 , 76 , 76 , 64 , 64 , 64 , 76 , 64 , 76 , 76 , 76 , 76 , 76 , 76 , 76 , 76 ] ],
-  "AMP_GAIN       " : [ [100], [100, 100, 120, 100, 100, 90 , 110, 100, 120, 120, 110, 127, 110, 127, 127, 120] ],
-  "AMP_ATTACK     " : [ [32], [32 , 32 , 32 , 32 , 32 , 32 , 32 , 0  , 90 , 0  , 32 , 0  , 0  , 100, 0  , 0  ] ],
-  "AMP_DECAY      " : [ [32], [32 , 32 , 32 , 32 , 32 , 32 , 32 , 0  , 32 , 40 , 32 , 50 , 32 , 32 , 30 , 80 ] ],
-  "AMP_SUSTAIN    " : [ [127], [127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 0  , 127, 127, 0  , 0  ] ],
-  "AMP_RELEASE    " : [ [32], [32 , 32 , 32 , 32 , 32 , 32 , 32 , 0  , 90 , 32 , 32 , 32 , 40 , 100, 20 , 60 ] ],
-  "FILTER_MODE    " : [ [0], [0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
-  "P_BEND_RANGE   " : [ [2], [2  , 2  , 2  , 2  , 2  , 2  , 2  , 2  , 2  , 2  , 2  , 2  , 2  , 2  , 2  , 2  ] ],
-  "EG_AMP_MOD     " : [ [0], [0  , 127, 127, 127, 0  , 0  , 127, 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
-  "REL_EQ_DECAY   " : [ [127], [127, 127, 127, 127, 127, 127, 127, 0  , 127, 127, 127, 127, 127, 127, 127, 127] ],
-  "BTH_FILTER_AMT " : [ [64], [64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 ] ],
-  "BTH_AMP_MOD    " : [ [0], [0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 64 , 0  , 0  , 0  , 0  , 0  , 0  ] ],
-  "EG_VEL_SENS    " : [ [0], [0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
-  "AMP_VEL_SENS   " : [ [0], [0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
-  "AFT_T_LFO_AMT  " : [ [0], [0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
-  "VOICE_ASGN_MODE" : [ [0], [0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
-  "PAN            " : [ [64], [64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 ] ],
-  "OSC_DRIFT      " : [ [32], [32 , 32 , 32 , 32 , 32 , 32 , 32 , 32 , 32 , 32 , 32 , 32 , 32 , 32 , 32 , 32 ] ],
-  "OSC_SAW_W_MODE " : [ [127], [127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127] ],
-  "CHORUS_MIX     " : [ [127], [127, 127, 127, 127, 127, 127, 127, 0  , 127, 0  , 0  , 127, 127, 127, 127, 127] ],
-  "CHORUS_RATE    " : [ [64], [64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 ] ],
-  "CHORUS_DEPTH   " : [ [64], [64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 ] ],
-  "DELAY_LEVEL    " : [ [64], [64 , 64 , 64 , 64 , 64 , 64 , 64 , 0  , 80 , 0  , 0  , 50 , 64 , 64 , 64 , 80 ] ],
-  "DELAY_MODE     " : [ [0], [0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  , 0  ] ],
-  "DELAY_TIME     " : [ [87], [87 , 87 , 87 , 87 , 87 , 87 , 87 , 87 , 87 , 87 , 87 , 87 , 87 , 87 , 87 , 87 ] ],
-  "DELAY_FEEDBACK " : [ [64], [64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 , 64 ] ],
-  "_end           " : ""
-}
-)";
+#include "FactoryPresets.h"
 
 //==============================================================================
 const char* const PRA32ColorcoderAudioProcessor::factoryPresetNames[16] = {
@@ -149,9 +92,12 @@ PRA32ColorcoderAudioProcessor::PRA32ColorcoderAudioProcessor()
                      #endif
                        ), apvts(*this, nullptr, "Parameters", createParameterLayout()), synthWrapper(std::make_unique<PRA32Wrapper>())
 {
-    // Initialize the engine, just like in wasm_wrapper.cpp
+    // Single authority for the startup state: factory preset 0 (INITIALIZATION).
+    // The APVTS defaults are authored to match this column, so after
+    // initialize() the engine, the APVTS and the UI all agree from the first
+    // sample. There is deliberately no transient program-15 state.
     synthWrapper->synth.initialize();
-    synthWrapper->synth.program_change(15); // Load Initial preset
+    synthWrapper->synth.program_change(0);
 
     // Cache the atomic pointers for fast polling in the audio thread
     for (const auto& p : SynthParameters::getParameters()) {
@@ -162,11 +108,45 @@ PRA32ColorcoderAudioProcessor::PRA32ColorcoderAudioProcessor()
         paramBindings.push_back(pb);
     }
 
+    for (auto& slot : pendingParameterValue)
+        slot.store (-1, std::memory_order_relaxed);
+
+    buildCcMap();
     capturePatchBaseline();
+
+    // Drains audio-thread MIDI requests into the APVTS on the message thread.
+    startTimer (15);
 }
 
 PRA32ColorcoderAudioProcessor::~PRA32ColorcoderAudioProcessor()
 {
+    stopTimer();
+}
+
+void PRA32ColorcoderAudioProcessor::buildCcMap()
+{
+    ccToParamIndex.fill (-1);
+
+    const auto& params = SynthParameters::getParameters();
+
+    for (int i = 0; i < (int) params.size(); ++i)
+    {
+        const int cc = params[(size_t) i].cc;
+
+        if (cc >= 0 && cc < (int) ccToParamIndex.size() && ccToParamIndex[(size_t) cc] < 0)
+            ccToParamIndex[(size_t) cc] = i;
+    }
+}
+
+juce::RangedAudioParameter*
+PRA32ColorcoderAudioProcessor::parameterForIndex (int index) const
+{
+    const auto& params = SynthParameters::getParameters();
+
+    if (index < 0 || index >= (int) params.size())
+        return nullptr;
+
+    return apvts.getParameter (params[(size_t) index].id);
 }
 
 //==============================================================================
@@ -255,7 +235,9 @@ void PRA32ColorcoderAudioProcessor::changeProgramName (int index, const juce::St
 
 void PRA32ColorcoderAudioProcessor::loadPreset(int index)
 {
-    juce::var parsedJson = juce::JSON::parse(factoryPresetsJson);
+    discardPendingParameterUpdates();
+
+    juce::var parsedJson = juce::JSON::parse(FactoryPresets::json());
     if (!parsedJson.isObject()) return;
     
     auto* obj = parsedJson.getDynamicObject();
@@ -296,6 +278,8 @@ void PRA32ColorcoderAudioProcessor::loadPreset(int index)
 
 void PRA32ColorcoderAudioProcessor::loadPresetFromJson(const juce::String& jsonString)
 {
+    discardPendingParameterUpdates();
+
     juce::var parsedJson = juce::JSON::parse(jsonString);
     if (!parsedJson.isObject()) return;
     
@@ -397,80 +381,216 @@ bool PRA32ColorcoderAudioProcessor::isBusesLayoutSupported (const BusesLayout& l
 void PRA32ColorcoderAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
+    const int totalNumInputChannels  = getTotalNumInputChannels();
+    const int totalNumOutputChannels = getTotalNumOutputChannels();
+    const int numSamples = buffer.getNumSamples();
 
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
+        buffer.clear (i, 0, numSamples);
 
-    // 0. Update Synth Parameters from APVTS
-    for (auto& pb : paramBindings) {
-        if (pb.valuePtr != nullptr) {
-            float val = pb.valuePtr->load(std::memory_order_relaxed);
-            if (val != pb.lastValue) {
-                pb.lastValue = val;
-                synthWrapper->synth.control_change(pb.cc, static_cast<uint8_t>(val));
-            }
-        }
-    }
+    // 1. Apply block-boundary parameter changes (GUI, host automation, state
+    //    recall, preset loads) to the engine.
+    updateEngineFromParameters();
 
-    // 1. Process MIDI Events
-    keyboardState.processNextMidiBuffer(midiMessages, 0, buffer.getNumSamples(), true);
+    // 2. Inject the on-screen keyboard's events into the MIDI stream.
+    keyboardState.processNextMidiBuffer (midiMessages, 0, numSamples, true);
+
+    // 3. Render sample-accurately: audio up to each event, apply the event,
+    //    then continue. The resampler keeps its phase/state across segments.
+    int startSample = 0;
 
     for (const auto metadata : midiMessages)
     {
-        auto msg = metadata.getMessage();
-        if (msg.isNoteOn()) {
-            synthWrapper->synth.note_on(msg.getNoteNumber(), msg.getVelocity());
-        } else if (msg.isNoteOff()) {
-            synthWrapper->synth.note_off(msg.getNoteNumber());
-        } else if (msg.isController()) {
-            synthWrapper->synth.control_change(msg.getControllerNumber(), msg.getControllerValue());
-        } else if (msg.isPitchWheel()) {
-            // JUCE pitch wheel is 0-16383, center 8192
-            int value = msg.getPitchWheelValue();
-            uint8_t lsb = value & 0x7F;
-            uint8_t msb = (value >> 7) & 0x7F;
-            synthWrapper->synth.pitch_bend(lsb, msb);
-        } else if (msg.isProgramChange()) {
-            synthWrapper->synth.program_change(msg.getProgramChangeNumber());
+        const int eventPosition = juce::jlimit (0, numSamples, metadata.samplePosition);
+
+        if (eventPosition > startSample)
+        {
+            renderAudioRange (buffer, startSample, eventPosition - startSample);
+            startSample = eventPosition;
         }
+
+        handleMidiMessage (metadata.getMessage());
     }
 
-    // 2. Process Audio (with resampling from 48kHz)
-    int numSamples = buffer.getNumSamples();
-    float* channelDataL = buffer.getWritePointer(0);
-    float* channelDataR = (totalNumOutputChannels > 1) ? buffer.getWritePointer(1) : nullptr;
+    if (startSample < numSamples)
+        renderAudioRange (buffer, startSample, numSamples - startSample);
+}
+
+void PRA32ColorcoderAudioProcessor::renderAudioRange (juce::AudioBuffer<float>& buffer, int startSample, int numSamples)
+{
+    if (numSamples <= 0)
+        return;
+
+    const int totalNumOutputChannels = getTotalNumOutputChannels();
+    float* channelDataL = buffer.getWritePointer (0);
+    float* channelDataR = (totalNumOutputChannels > 1) ? buffer.getWritePointer (1) : nullptr;
 
     for (int i = 0; i < numSamples; ++i)
     {
-        // Fetch new samples from the 48kHz engine as needed
+        // Fetch new samples from the 48kHz engine as needed.
         while (currentPhase >= 1.0)
         {
             lastL = nextL;
             lastR = nextR;
 
-            // Generate exactly one sample from the engine
             int16_t right_out = 0;
-            int16_t left_out = synthWrapper->synth.process(0, 0, right_out);
-            
-            // Convert from int16 to float (-1.0 to 1.0)
+            int16_t left_out = synthWrapper->synth.process (0, 0, right_out);
+
             nextL = left_out / 32768.0f;
             nextR = right_out / 32768.0f;
 
             currentPhase -= 1.0;
         }
 
-        // Linear interpolation
-        float outL = lastL + (nextL - lastL) * currentPhase;
-        float outR = lastR + (nextR - lastR) * currentPhase;
+        const float outL = lastL + (nextL - lastL) * (float) currentPhase;
+        const float outR = lastR + (nextR - lastR) * (float) currentPhase;
 
-        channelDataL[i] = outL;
+        channelDataL[startSample + i] = outL;
+
         if (channelDataR != nullptr)
-            channelDataR[i] = outR;
+            channelDataR[startSample + i] = outR;
 
         currentPhase += phaseIncrement;
     }
+}
+
+void PRA32ColorcoderAudioProcessor::updateEngineFromParameters()
+{
+    const int count = juce::jmin ((int) paramBindings.size(), (int) ccToParamIndex.size());
+
+    for (int i = 0; i < count; ++i)
+    {
+        auto& pb = paramBindings[(size_t) i];
+
+        if (pb.valuePtr == nullptr)
+            continue;
+
+        const float val = pb.valuePtr->load (std::memory_order_relaxed);
+
+        if (pb.midiPending)
+        {
+            const int apvtsValue = (int) std::lround (val);
+
+            if (apvtsValue == pb.midiTarget)
+            {
+                // The APVTS caught up with the MIDI CC; adopt it and resume
+                // normal host/GUI tracking.
+                pb.midiPending = false;
+                pb.lastValue = val;
+            }
+            else if (apvtsValue != (int) std::lround (pb.preMidiValue)
+                     || --pb.midiPendingBlocks <= 0)
+            {
+                // The user/host changed the value while the MIDI update was in
+                // flight, or the deferred write never landed; the APVTS wins.
+                pb.midiPending = false;
+                pb.lastValue = val;
+                synthWrapper->synth.control_change (pb.cc, (uint8_t) juce::jlimit (0, 127, apvtsValue));
+            }
+
+            continue;
+        }
+
+        if (val != pb.lastValue)
+        {
+            pb.lastValue = val;
+            synthWrapper->synth.control_change (pb.cc, (uint8_t) juce::jlimit (0, 127, (int) std::lround (val)));
+        }
+    }
+}
+
+void PRA32ColorcoderAudioProcessor::handleMidiMessage (const juce::MidiMessage& msg)
+{
+    if (msg.isNoteOn())
+    {
+        synthWrapper->synth.note_on (msg.getNoteNumber(), msg.getVelocity());
+    }
+    else if (msg.isNoteOff())
+    {
+        synthWrapper->synth.note_off (msg.getNoteNumber());
+    }
+    else if (msg.isController())
+    {
+        const int controller = msg.getControllerNumber();
+        const int value = msg.getControllerValue();
+
+        // Always forward to the engine immediately so performance controllers
+        // (sustain, expression, breath, modulation) stay sample-accurate.
+        synthWrapper->synth.control_change ((uint8_t) controller, (uint8_t) value);
+
+        // If this CC is also an automatable parameter, mirror it into the APVTS
+        // through a lock-free request so GUI/host/session state stay coherent.
+        if (controller >= 0 && controller < (int) ccToParamIndex.size())
+        {
+            const int parameterIndex = ccToParamIndex[(size_t) controller];
+
+            if (parameterIndex >= 0 && parameterIndex < (int) paramBindings.size())
+            {
+                auto& pb = paramBindings[(size_t) parameterIndex];
+
+                if (! pb.midiPending)
+                    pb.preMidiValue = pb.lastValue;
+
+                pb.midiPending = true;
+                pb.midiTarget = value;
+                pb.midiPendingBlocks = 20;
+                pb.lastValue = (float) value;
+
+                pendingParameterValue[(size_t) parameterIndex].store (value, std::memory_order_relaxed);
+            }
+        }
+    }
+    else if (msg.isPitchWheel())
+    {
+        // JUCE pitch wheel is 0-16383, centre 8192.
+        const int value = msg.getPitchWheelValue();
+        synthWrapper->synth.pitch_bend ((uint8_t) (value & 0x7F), (uint8_t) ((value >> 7) & 0x7F));
+    }
+    else if (msg.isChannelPressure())
+    {
+        synthWrapper->synth.after_touch_channel ((uint8_t) msg.getChannelPressureValue());
+    }
+    else if (msg.isAftertouch())
+    {
+        synthWrapper->synth.after_touch_poly ((uint8_t) msg.getNoteNumber(),
+                                              (uint8_t) msg.getAfterTouchValue());
+    }
+    else if (msg.isProgramChange())
+    {
+        // Routed through the same preset pipeline the UI uses, evaluated on the
+        // message thread where JSON parsing and host notifications are safe.
+        pendingProgramChange.store (msg.getProgramChangeNumber(), std::memory_order_relaxed);
+    }
+}
+
+void PRA32ColorcoderAudioProcessor::discardPendingParameterUpdates() noexcept
+{
+    for (auto& slot : pendingParameterValue)
+        slot.store (-1, std::memory_order_relaxed);
+}
+
+void PRA32ColorcoderAudioProcessor::flushDeferredUpdates()
+{
+    for (int i = 0; i < (int) pendingParameterValue.size(); ++i)
+    {
+        const int value = pendingParameterValue[(size_t) i].exchange (-1, std::memory_order_relaxed);
+
+        if (value < 0)
+            continue;
+
+        if (auto* param = parameterForIndex (i))
+            param->setValueNotifyingHost (param->convertTo0to1 ((float) juce::jlimit (0, 127, value)));
+    }
+
+    const int program = pendingProgramChange.exchange (-1, std::memory_order_relaxed);
+
+    if (program >= 0)
+        loadPreset (juce::jlimit (0, 15, program));
+}
+
+void PRA32ColorcoderAudioProcessor::timerCallback()
+{
+    flushDeferredUpdates();
 }
 
 #include "PluginEditor.h"
@@ -502,6 +622,7 @@ void PRA32ColorcoderAudioProcessor::setStateInformation (const void* data, int s
     {
         if (xmlState->hasTagName (apvts.state.getType()))
         {
+            discardPendingParameterUpdates();
             apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
             capturePatchBaseline();
 

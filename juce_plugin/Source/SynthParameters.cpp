@@ -1,5 +1,7 @@
 #include "SynthParameters.h"
 
+#include <cmath>
+
 namespace {
 
 juce::StringArray enumOsc1Wave()   { return { "SAW", "SQR", "TRI", "SIN", "WT", "PLS" }; }
@@ -7,8 +9,9 @@ juce::StringArray enumOsc2Wave()   { return { "SAW", "SQR", "TRI", "SIN", "OSC 1
 juce::StringArray enumLfoWave()    { return { "TRI", "SINE", "NOISE", "SAW", "S&H", "SQUARE" }; }
 juce::StringArray enumFilterMode() { return { "LOW PASS", "HIGH PASS" }; }
 juce::StringArray enumSawMode()    { return { "STRAIGHT", "CURVED" }; }
-juce::StringArray enumModDst()     { return { "PITCH 1+2", "PITCH 1+2", "PITCH 2", "PITCH 2", "CUTOFF", "SHAPE 1" }; }
-juce::StringArray enumVoiceMode()  { return { "POLY", "POLY", "MONO", "MONO", "LGTO PORTA", "LEGATO" }; }
+juce::StringArray enumEgModDst()   { return { "PITCH 1+2", "CUTOFF", "PITCH 2", "SHAPE 1" }; }
+juce::StringArray enumLfoModDst()  { return { "PITCH 1+2", "PITCH 2", "CUTOFF", "SHAPE 1" }; }
+juce::StringArray enumVoiceMode()  { return { "POLY", "MONO", "LEGATO + PORTA", "LEGATO" }; }
 juce::StringArray enumAsgnMode()   { return { "MODE 1", "MODE 2" }; }
 juce::StringArray enumBreathAmp()  { return { "OFF", "QUAD", "LIN" }; }
 juce::StringArray enumDelayMode()  { return { "STEREO", "PING PONG" }; }
@@ -25,16 +28,16 @@ const std::vector<SynthParamData>& SynthParameters::getParameters()
         { "osc1Wave", "Osc 1 Wave", "WAVE", "OSC_1_WAVE", ccOsc1Wave, 0, 127, 0,
           "OSC", "OSCILLATOR 1", PRA32ControlKind::SteppedSelector, false, 0,
           PRA32FormatKind::Enum, "", enumOsc1Wave(), 2 },
-        { "osc1Shape", "Osc 1 Shape", "SHAPE", "OSC_1_SHAPE", ccOsc1Shape, 0, 127, 0,
+        { "osc1Shape", "Osc 1 Shape", "SHAPE", "OSC_1_SHAPE", ccOsc1Shape, 0, 127, 64,
           "OSC", "OSCILLATOR 1", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Percent, "%", {}, 2 },
         { "osc1Morph", "Osc 1 Morph", "MORPH", "OSC_1_MORPH", ccOsc1Morph, 0, 127, 0,
           "OSC", "OSCILLATOR 1", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Percent, "%", {}, 2 },
-        { "oscDrift", "Osc Drift", "DRIFT", "OSC_DRIFT", ccOscDrift, 0, 127, 0,
+        { "oscDrift", "Osc Drift", "DRIFT", "OSC_DRIFT", ccOscDrift, 0, 127, 32,
           "OSC", "OSCILLATOR 1", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Percent, "%", {}, 1 },
-        { "sawWMode", "Saw Wave Mode", "SAW MODE", "OSC_SAW_W_MODE", ccSawWMode, 0, 127, 0,
+        { "sawWMode", "Saw Wave Mode", "SAW MODE", "OSC_SAW_W_MODE", ccSawWMode, 0, 127, 127,
           "OSC", "OSCILLATOR 1", PRA32ControlKind::SteppedSelector, false, 0,
           PRA32FormatKind::Enum, "", enumSawMode(), 1 },
 
@@ -44,67 +47,67 @@ const std::vector<SynthParamData>& SynthParameters::getParameters()
         { "osc2Coarse", "Osc 2 Coarse", "COARSE", "OSC_2_COARSE", ccOsc2Coarse, 0, 127, 64,
           "OSC", "OSCILLATOR 2", PRA32ControlKind::BipolarRotary, true, 64,
           PRA32FormatKind::Semitones, "st", {}, 2 },
-        { "osc2Pitch", "Osc 2 Fine", "FINE", "OSC_2_PITCH", ccOsc2Pitch, 0, 127, 64,
+        { "osc2Pitch", "Osc 2 Fine", "FINE", "OSC_2_PITCH", ccOsc2Pitch, 0, 127, 72,
           "OSC", "OSCILLATOR 2", PRA32ControlKind::BipolarRotary, true, 64,
           PRA32FormatKind::Detune, "", {}, 2 },
 
         { "oscMix", "Osc Mix", "OSC 1 / OSC 2", "MIXER_OSC_MIX", ccOscMix, 0, 127, 64,
           "OSC", "MIXER", PRA32ControlKind::BipolarRotary, true, 64,
           PRA32FormatKind::OscMix, "", {}, 2 },
-        { "subOsc", "Noise / Sub Osc", "NOISE / SUB", "MIXER_SUB_OSC", ccSubOsc, 0, 127, 0,
+        { "subOsc", "Noise / Sub Osc", "NOISE / SUB", "MIXER_SUB_OSC", ccSubOsc, 0, 127, 64,
           "OSC", "MIXER", PRA32ControlKind::BipolarRotary, true, 64,
           PRA32FormatKind::NoiseSub, "", {}, 2 },
 
         // ---------------------------------------------------------------------
         // FILTER
         // ---------------------------------------------------------------------
-        { "filterCutoff", "Filter Cutoff", "CUTOFF", "FILTER_CUTOFF", ccFilterCutoff, 0, 127, 127,
+        { "filterCutoff", "Filter Cutoff", "CUTOFF", "FILTER_CUTOFF", ccFilterCutoff, 0, 127, 112,
           "FILTER", "FILTER", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::HertzOrKilo, "Hz", {}, 3 },
-        { "filterReso", "Filter Resonance", "RESONANCE", "FILTER_RESO", ccFilterReso, 0, 127, 0,
+        { "filterReso", "Filter Resonance", "RESONANCE", "FILTER_RESO", ccFilterReso, 0, 127, 48,
           "FILTER", "FILTER", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::ResonanceQ, "Q", {}, 3 },
         { "filterMode", "Filter Mode", "FILTER TYPE", "FILTER_MODE", ccFilterMode, 0, 127, 0,
           "FILTER", "FILTER", PRA32ControlKind::SteppedSelector, false, 0,
           PRA32FormatKind::Enum, "", enumFilterMode(), 2 },
-        { "egFltAmt", "Filter EG Amount", "MOD AMOUNT", "FILTER_EG_AMT", ccFilterEgAmt, 0, 127, 64,
+        { "egFltAmt", "Filter EG Amount", "MOD AMOUNT", "FILTER_EG_AMT", ccFilterEgAmt, 0, 127, 40,
           "FILTER", "FILTER", PRA32ControlKind::BipolarRotary, true, 64,
           PRA32FormatKind::SignedAmount, "", {}, 2 },
-        { "filterKeyTrk", "Filter Key Track", "KEY TRACK", "FILTER_KEY_TRK", ccFilterKeyTrk, 0, 127, 64,
+        { "filterKeyTrk", "Filter Key Track", "KEY TRACK", "FILTER_KEY_TRK", ccFilterKeyTrk, 0, 127, 96,
           "FILTER", "FILTER", PRA32ControlKind::BipolarRotary, true, 64,
           PRA32FormatKind::KeyTrack, "", {}, 1 },
         { "bthFltAmt", "Breath Filter Amount", "BREATH AMT", "BTH_FILTER_AMT", ccBreathFltAmt, 0, 127, 64,
           "FILTER", "FILTER", PRA32ControlKind::BipolarRotary, true, 64,
           PRA32FormatKind::SignedAmount, "", {}, 1 },
-        { "relEqDcy", "Release Equals Decay", "REL = DEC", "REL_EQ_DECAY", ccRelEqDecay, 0, 127, 0,
+        { "relEqDcy", "Release Equals Decay", "REL = DEC", "REL_EQ_DECAY", ccRelEqDecay, 0, 127, 127,
           "FILTER", "FILTER", PRA32ControlKind::Toggle, false, 0,
           PRA32FormatKind::OnOff, "", enumOnOff(), 1 },
 
         // ---------------------------------------------------------------------
         // ENVS
         // ---------------------------------------------------------------------
-        { "egAttack", "Mod Attack", "ATTACK", "EG_ATTACK", ccEgAttack, 0, 127, 0,
+        { "egAttack", "Mod Attack", "ATTACK", "EG_ATTACK", ccEgAttack, 0, 127, 96,
           "ENVS", "MOD ENVELOPE", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Milliseconds, "ms", {}, 2 },
-        { "egDecay", "Mod Decay", "DECAY", "EG_DECAY", ccEgDecay, 0, 127, 64,
+        { "egDecay", "Mod Decay", "DECAY", "EG_DECAY", ccEgDecay, 0, 127, 96,
           "ENVS", "MOD ENVELOPE", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::MillisecondsNoDecay, "ms", {}, 2 },
-        { "egSustain", "Mod Sustain", "SUSTAIN", "EG_SUSTAIN", ccEgSustain, 0, 127, 127,
+        { "egSustain", "Mod Sustain", "SUSTAIN", "EG_SUSTAIN", ccEgSustain, 0, 127, 0,
           "ENVS", "MOD ENVELOPE", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Percent, "%", {}, 2 },
-        { "egRelease", "Mod Release", "RELEASE", "EG_RELEASE", ccEgRelease, 0, 127, 64,
+        { "egRelease", "Mod Release", "RELEASE", "EG_RELEASE", ccEgRelease, 0, 127, 32,
           "ENVS", "MOD ENVELOPE", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Milliseconds, "ms", {}, 2 },
-        { "ampAttack", "Amp Attack", "ATTACK", "AMP_ATTACK", ccAmpAttack, 0, 127, 0,
+        { "ampAttack", "Amp Attack", "ATTACK", "AMP_ATTACK", ccAmpAttack, 0, 127, 32,
           "ENVS", "AMP ENVELOPE", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Milliseconds, "ms", {}, 2 },
-        { "ampDecay", "Amp Decay", "DECAY", "AMP_DECAY", ccAmpDecay, 0, 127, 64,
+        { "ampDecay", "Amp Decay", "DECAY", "AMP_DECAY", ccAmpDecay, 0, 127, 32,
           "ENVS", "AMP ENVELOPE", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::MillisecondsNoDecay, "ms", {}, 2 },
         { "ampSustain", "Amp Sustain", "SUSTAIN", "AMP_SUSTAIN", ccAmpSustain, 0, 127, 127,
           "ENVS", "AMP ENVELOPE", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Percent, "%", {}, 2 },
-        { "ampRelease", "Amp Release", "RELEASE", "AMP_RELEASE", ccAmpRelease, 0, 127, 64,
+        { "ampRelease", "Amp Release", "RELEASE", "AMP_RELEASE", ccAmpRelease, 0, 127, 32,
           "ENVS", "AMP ENVELOPE", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Milliseconds, "ms", {}, 2 },
         { "egOscAmt", "EG Pitch Amount", "PITCH MOD", "EG_OSC_AMT", ccEgOscAmt, 0, 127, 64,
@@ -112,7 +115,7 @@ const std::vector<SynthParamData>& SynthParameters::getParameters()
           PRA32FormatKind::PitchModAmount, "", {}, 2 },
         { "egOscDst", "EG Mod Destination", "EG DEST", "EG_OSC_DST", ccEgOscDst, 0, 127, 0,
           "CHARACTER", "PITCH MOD", PRA32ControlKind::SteppedSelector, false, 0,
-          PRA32FormatKind::Enum, "", enumModDst(), 1 },
+          PRA32FormatKind::Enum, "", enumEgModDst(), 1 },
 
         // ---------------------------------------------------------------------
         // MOD
@@ -120,7 +123,7 @@ const std::vector<SynthParamData>& SynthParameters::getParameters()
         { "lfoWave", "LFO Wave", "WAVE", "LFO_WAVE", ccLfoWave, 0, 127, 0,
           "MOD", "LFO", PRA32ControlKind::SteppedSelector, false, 0,
           PRA32FormatKind::Enum, "", enumLfoWave(), 2 },
-        { "lfoRate", "LFO Rate", "RATE", "LFO_RATE", ccLfoRate, 0, 127, 64,
+        { "lfoRate", "LFO Rate", "RATE", "LFO_RATE", ccLfoRate, 0, 127, 80,
           "MOD", "LFO", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Hertz, "Hz", {}, 2 },
         { "lfoFadeTime", "LFO Fade Time", "FADE IN", "LFO_FADE_TIME", ccLfoFade, 0, 127, 0,
@@ -129,7 +132,7 @@ const std::vector<SynthParamData>& SynthParameters::getParameters()
         { "lfoDepth", "LFO Depth", "DEPTH", "LFO_DEPTH", ccLfoDepth, 0, 127, 0,
           "MOD", "LFO", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Percent, "%", {}, 2 },
-        { "lfoFltAmt", "LFO Filter Amount", "CUTOFF AMT", "LFO_FILTER_AMT", ccLfoFltAmt, 0, 127, 64,
+        { "lfoFltAmt", "LFO Filter Amount", "CUTOFF AMT", "LFO_FILTER_AMT", ccLfoFltAmt, 0, 127, 76,
           "MOD", "LFO", PRA32ControlKind::BipolarRotary, true, 64,
           PRA32FormatKind::SignedAmount, "", {}, 2 },
         { "lfoOscAmt", "LFO Pitch Amount", "PITCH AMT", "LFO_OSC_AMT", ccLfoOscAmt, 0, 127, 64,
@@ -137,11 +140,11 @@ const std::vector<SynthParamData>& SynthParameters::getParameters()
           PRA32FormatKind::PitchModAmount, "", {}, 2 },
         { "lfoOscDst", "LFO Mod Destination", "LFO DEST", "LFO_OSC_DST", ccLfoOscDst, 0, 127, 0,
           "MOD", "LFO", PRA32ControlKind::SteppedSelector, false, 0,
-          PRA32FormatKind::Enum, "", enumModDst(), 1 },
+          PRA32FormatKind::Enum, "", enumLfoModDst(), 1 },
         { "pbRange", "Pitch Bend Range", "BEND RANGE", "P_BEND_RANGE", ccPbRange, 0, 127, 2,
           "CHARACTER", "PERFORMANCE", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Semitones, "st", {}, 1 },
-        { "portaTime", "Portamento", "GLIDE TIME", "PORTAMENTO", ccPortamento, 0, 127, 0,
+        { "portaTime", "Portamento", "GLIDE TIME", "PORTAMENTO", ccPortamento, 0, 127, 48,
           "CHARACTER", "PERFORMANCE", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Portamento, "ms", {}, 1 },
 
@@ -151,16 +154,16 @@ const std::vector<SynthParamData>& SynthParameters::getParameters()
         { "chorusMix", "Chorus Level", "LEVEL", "CHORUS_MIX", ccChorusMix, 0, 127, 127,
           "FX", "CHORUS", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Percent, "%", {}, 2 },
-        { "choRate", "Chorus Rate", "RATE", "CHORUS_RATE", ccChorusRate, 0, 127, 0,
+        { "choRate", "Chorus Rate", "RATE", "CHORUS_RATE", ccChorusRate, 0, 127, 64,
           "FX", "CHORUS", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Hertz, "Hz", {}, 2 },
-        { "choDepth", "Chorus Depth", "DEPTH", "CHORUS_DEPTH", ccChorusDepth, 0, 127, 0,
+        { "choDepth", "Chorus Depth", "DEPTH", "CHORUS_DEPTH", ccChorusDepth, 0, 127, 64,
           "FX", "CHORUS", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::ChorusDepth, "ms", {}, 2 },
-        { "delayTime", "Delay Time", "TIME", "DELAY_TIME", ccDelayTime, 0, 127, 64,
+        { "delayTime", "Delay Time", "TIME", "DELAY_TIME", ccDelayTime, 0, 127, 87,
           "FX", "DELAY", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::DelayTime, "ms", {}, 3 },
-        { "delayDepth", "Delay Level", "LEVEL", "DELAY_LEVEL", ccDelayLevel, 0, 127, 0,
+        { "delayDepth", "Delay Level", "LEVEL", "DELAY_LEVEL", ccDelayLevel, 0, 127, 64,
           "FX", "DELAY", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Percent, "%", {}, 2 },
         { "delayFeedback", "Delay Feedback", "FEEDBACK", "DELAY_FEEDBACK", ccDelayFeedback, 0, 127, 64,
@@ -172,7 +175,7 @@ const std::vector<SynthParamData>& SynthParameters::getParameters()
         { "pan", "Pan", "PAN", "PAN", ccPan, 0, 127, 64,
           "CHARACTER", "OUTPUT", PRA32ControlKind::BipolarRotary, true, 64,
           PRA32FormatKind::Pan, "", {}, 2 },
-        { "ampGain", "Amp Gain", "AMP GAIN", "AMP_GAIN", ccAmpGain, 0, 127, 64,
+        { "ampGain", "Amp Gain", "AMP GAIN", "AMP_GAIN", ccAmpGain, 0, 127, 100,
           "CHARACTER", "OUTPUT", PRA32ControlKind::Rotary, false, 0,
           PRA32FormatKind::Decibels, "dB", {}, 3 },
         { "ampExpnt", "EG Amp Mod", "EG AMP MOD", "EG_AMP_MOD", ccEgAmpMod, 0, 127, 0,
@@ -212,4 +215,69 @@ const SynthParamData* SynthParameters::find(const juce::String& id)
             return &p;
 
     return nullptr;
+}
+
+const PRA32ParamLogic::EnumRange* SynthParameters::enumRanges (const SynthParamData& p, int& count)
+{
+    if (p.id == "egOscDst")
+    {
+        count = PRA32ParamLogic::kEgOscDestRangeCount;
+        return PRA32ParamLogic::kEgOscDestRanges;
+    }
+
+    if (p.id == "lfoOscDst")
+    {
+        count = PRA32ParamLogic::kLfoOscDestRangeCount;
+        return PRA32ParamLogic::kLfoOscDestRanges;
+    }
+
+    if (p.id == "portaMode")
+    {
+        count = PRA32ParamLogic::kVoiceModeRangeCount;
+        return PRA32ParamLogic::kVoiceModeRanges;
+    }
+
+    count = 0;
+    return nullptr;
+}
+
+int SynthParameters::enumIndex (const SynthParamData& p, int value)
+{
+    int count = 0;
+    if (auto* ranges = enumRanges (p, count))
+        return PRA32ParamLogic::enumIndexFromRanges (ranges, count, value);
+
+    const int n = p.enumLabels.size();
+
+    if (n == 2) return value < 64 ? 0 : 1;
+    if (n == 3) return value < 32 ? 0 : (value < 96 ? 1 : 2);
+    if (n == 6)
+        return value < 13 ? 0 : (value < 39 ? 1 : (value < 64 ? 2
+               : (value < 89 ? 3 : (value < 115 ? 4 : 5))));
+
+    return juce::jlimit (0, juce::jmax (0, n - 1), (value * n) / 128);
+}
+
+int SynthParameters::enumRepresentative (const SynthParamData& p, int index)
+{
+    int count = 0;
+    if (auto* ranges = enumRanges (p, count))
+        return ranges[juce::jlimit (0, count - 1, index)].representativeValue;
+
+    const int n = p.enumLabels.size();
+    index = juce::jlimit (0, juce::jmax (0, n - 1), index);
+
+    if (n == 2) return index == 0 ? 0 : 127;
+    if (n == 3) return index == 0 ? 0 : (index == 1 ? 64 : 127);
+
+    if (n == 6)
+    {
+        static const int values[6] = { 6, 25, 51, 76, 101, 121 };
+        return values[index];
+    }
+
+    if (n <= 0)
+        return 0;
+
+    return juce::jlimit (0, 127, (int) std::round ((index + 0.5) * 128.0 / n));
 }

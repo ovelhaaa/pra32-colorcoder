@@ -6,17 +6,28 @@
 class PRA32Wrapper;
 
 #include "SynthParameters.h"
+#include <array>
+#include <atomic>
 #include <vector>
 
 struct ParamBinding {
-    int cc;
+    int cc = 0;
     std::atomic<float>* valuePtr = nullptr;
     float lastValue = -1.0f;
+
+    // Audio-thread-only bookkeeping for MIDI-CC-driven parameter overrides.
+    // While `midiPending` is true the APVTS value is lagging behind the engine
+    // and must not be pushed back until it catches up (or the user changes it).
+    bool midiPending = false;
+    int midiTarget = -1;
+    float preMidiValue = -1.0f;
+    int midiPendingBlocks = 0; // safety valve so an override can never stick forever
 };
 // -----------------------------------------------------------------------------
 
 class PRA32ColorcoderAudioProcessor  : public juce::AudioProcessor,
-                                       public juce::ChangeBroadcaster
+                                       public juce::ChangeBroadcaster,
+                                       private juce::Timer
 {
 public:
     PRA32ColorcoderAudioProcessor();
@@ -70,10 +81,14 @@ public:
     juce::var getUiProperty (const juce::Identifier& key) const;
     void setUiProperty (const juce::Identifier& key, const juce::var& value);
 
+    // Applies queued audio-thread parameter/program requests to the APVTS.
+    // Called by the internal timer on the message thread; exposed so the
+    // automated tests can drive it without a running message loop.
+    void flushDeferredUpdates();
+
 private:
     // -------------------------------------------------------------------------
     // Core Engine Instantiation
-    // Based on `web_app/wasm_wrapper.cpp`
     // -------------------------------------------------------------------------
     std::unique_ptr<PRA32Wrapper> synthWrapper;
     
@@ -84,6 +99,30 @@ private:
     juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
     
     std::vector<ParamBinding> paramBindings;
+
+    // Precomputed CC -> parameter index map (read on the audio thread).
+    std::array<int, 128> ccToParamIndex {};
+
+    // MIDI-CC values waiting to be written back into the APVTS on the message
+    // thread. -1 means "nothing pending". The audio thread only stores integers;
+    // the message thread drains them, so no allocation or locking happens on the
+    // audio path.
+    static constexpr int kMaxParameters = 128;
+    std::array<std::atomic<int>, kMaxParameters> pendingParameterValue {};
+    std::atomic<int> pendingProgramChange { -1 };
+
+    juce::RangedAudioParameter* parameterForIndex (int index) const;
+    void buildCcMap();
+
+    void renderAudioRange (juce::AudioBuffer<float>& buffer, int startSample, int numSamples);
+    void updateEngineFromParameters();
+    void handleMidiMessage (const juce::MidiMessage& msg);
+
+    void timerCallback() override;
+
+    // Drops any queued MIDI-CC parameter writes; used when a preset/state load
+    // takes ownership of the parameters.
+    void discardPendingParameterUpdates() noexcept;
 
     int currentFactoryPreset = 0;
     std::vector<int> patchBaseline;
