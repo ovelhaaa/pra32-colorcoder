@@ -66,7 +66,9 @@ add_test(NAME resampler   COMMAND pra32_resampler_tests)
 # sources so the tests exercise the shipping implementation.
 # -----------------------------------------------------------------------------
 if (TARGET juce::juce_audio_processors)
-    juce_add_console_app(pra32_plugin_tests PRODUCT_NAME "PRA32 Plugin Tests")
+    juce_add_console_app(pra32_plugin_tests
+        PRODUCT_NAME "PRA32 Plugin Tests"
+        VERSION 1.0.0)
 
     target_sources(pra32_plugin_tests PRIVATE
         plugin_tests.cpp
