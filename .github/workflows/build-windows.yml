@@ -14,6 +14,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Validate factory preset mirrors
+      run: python scripts/validate_factory_presets.py
+
     - name: Configure CMake
       run: cmake -S juce_plugin -B juce_plugin/build -DCMAKE_BUILD_TYPE=Release -DPRA32_BUILD_TESTS=ON
 

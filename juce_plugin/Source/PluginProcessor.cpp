@@ -31,7 +31,10 @@ public:
 };
 // -----------------------------------------------------------------------------
 
-#include "FactoryPresets.h"
+#include "FactoryProgramTable.h"
+
+static_assert (FactoryPrograms::kProgramCount == PRA32MidiState::kFactoryProgramCount,
+               "Factory program table and MIDI state must agree on the program count");
 
 namespace
 {
@@ -118,11 +121,12 @@ PRA32ColorcoderAudioProcessor::PRA32ColorcoderAudioProcessor()
                        ), apvts(*this, nullptr, "Parameters", createParameterLayout()), synthWrapper(std::make_unique<PRA32Wrapper>())
 {
     // Single authority for the startup state: factory preset 0 (INITIALIZATION).
-    // The APVTS defaults are authored to match this column, so after
-    // initialize() the engine, the APVTS and the UI all agree from the first
-    // sample. There is deliberately no transient last-program state.
+    // The engine is initialised explicitly from the canonical factory table
+    // (not from its own 16-program ROM), and the APVTS defaults are authored to
+    // match column 0 of that same table, so engine, APVTS and UI agree from the
+    // first sample. There is deliberately no transient last-program state.
     synthWrapper->synth.initialize();
-    synthWrapper->synth.program_change(0);
+    applyProgramToEngine (0);
 
     // Cache the atomic pointers for fast polling in the audio thread
     for (const auto& p : SynthParameters::getParameters()) {
@@ -319,61 +323,17 @@ void PRA32ColorcoderAudioProcessor::loadPreset(int index)
     mirrorProgramToAPVTSAndUI (index);
 }
 
-void PRA32ColorcoderAudioProcessor::ensureFactoryPresetCache()
-{
-    if (factoryPresetCacheReady)
-        return;
-
-    const auto& params = SynthParameters::getParameters();
-
-    factoryPresetValues.assign (params.size(),
-                                std::array<int, PRA32MidiState::kFactoryProgramCount> {});
-
-    for (size_t i = 0; i < params.size(); ++i)
-        factoryPresetValues[i].fill (params[i].def);
-
-    juce::var parsedJson = juce::JSON::parse (FactoryPresets::json());
-
-    if (auto* obj = parsedJson.getDynamicObject())
-    {
-        for (size_t i = 0; i < params.size(); ++i)
-        {
-            for (auto& prop : obj->getProperties())
-            {
-                if (prop.name.toString().trim() != params[i].presetKey)
-                    continue;
-
-                if (auto* arr = prop.value.getArray())
-                    if (arr->size() > 1 && arr->getReference (1).isArray())
-                        if (auto* presetArr = arr->getReference (1).getArray())
-                            for (int program = 0;
-                                 program < PRA32MidiState::kFactoryProgramCount
-                                     && program < presetArr->size();
-                                 ++program)
-                                factoryPresetValues[i][(size_t) program] =
-                                    presetArr->getReference (program);
-
-                break;
-            }
-        }
-    }
-
-    factoryPresetCacheReady = true;
-}
-
 void PRA32ColorcoderAudioProcessor::writeProgramValuesToAPVTS (int program)
 {
     if (! PRA32MidiState::isValidFactoryProgram (program))
         return;
 
-    ensureFactoryPresetCache();
-
     const auto& params = SynthParameters::getParameters();
 
-    for (size_t i = 0; i < params.size() && i < factoryPresetValues.size(); ++i)
+    for (size_t i = 0; i < params.size() && i < (size_t) FactoryPrograms::kParameterCount; ++i)
         if (auto* param = apvts.getParameter (params[i].id))
             param->setValueNotifyingHost (
-                param->convertTo0to1 ((float) factoryPresetValues[i][(size_t) program]));
+                param->convertTo0to1 ((float) FactoryPrograms::valueFor ((int) i, program)));
 }
 
 void PRA32ColorcoderAudioProcessor::captureBaselineFromProgram (int program)
@@ -383,13 +343,11 @@ void PRA32ColorcoderAudioProcessor::captureBaselineFromProgram (int program)
     if (! PRA32MidiState::isValidFactoryProgram (program))
         return;
 
-    ensureFactoryPresetCache();
-
     const auto& params = SynthParameters::getParameters();
 
     for (size_t i = 0; i < params.size(); ++i)
-        patchBaseline.push_back (i < factoryPresetValues.size()
-                                     ? factoryPresetValues[i][(size_t) program]
+        patchBaseline.push_back (i < (size_t) FactoryPrograms::kParameterCount
+                                     ? FactoryPrograms::valueFor ((int) i, program)
                                      : params[i].def);
 }
 
@@ -417,7 +375,32 @@ void PRA32ColorcoderAudioProcessor::mirrorProgramToAPVTSAndUI (int program)
 void PRA32ColorcoderAudioProcessor::applyProgramToEngine (int program) noexcept
 {
     // Realtime path: the engine is mutated immediately, at the MIDI event sample.
-    synthWrapper->synth.program_change ((uint8_t) program);
+    // Every parameter of the canonical table is pushed through control_change()
+    // exactly as the block-boundary APVTS mirror would push it, so the engine
+    // ends up with the same patch that later appears in the APVTS/UI. Programs
+    // 16..25 are ordinary table columns, so they are as sample-accurate as 0..15.
+    if (! PRA32MidiState::isValidFactoryProgram (program))
+        return;
+
+    for (int i = 0; i < FactoryPrograms::kParameterCount; ++i)
+    {
+        const auto& row = FactoryPrograms::kRows[(size_t) i];
+        synthWrapper->synth.control_change ((uint8_t) row.cc,
+                                            (uint8_t) row.values[(size_t) program]);
+    }
+}
+
+int PRA32ColorcoderAudioProcessor::getEngineParameterValue (int parameterIndex)
+{
+    if (parameterIndex < 0 || parameterIndex >= (int) paramBindings.size())
+        return -1;
+
+    const int cc = paramBindings[(size_t) parameterIndex].cc;
+
+    if (cc < 0 || cc >= 128)
+        return -1;
+
+    return (int) synthWrapper->synth.current_controller_value ((uint8_t) cc);
 }
 
 void PRA32ColorcoderAudioProcessor::queueProgramChange (int program) noexcept
@@ -518,10 +501,12 @@ void PRA32ColorcoderAudioProcessor::prepareToPlay (double sampleRate, int sample
     // All filter/history memory is reserved here (never on the audio thread).
     resampler.prepare (sampleRate);
 
-    // The resampler owns the samples it needs, so it adds no input/output
-    // latency: MIDI events land on the engine sample that maps to their host
-    // sample. Report that explicitly.
-    setLatencySamples (0);
+    // The resampler is causal: it only ever requests engine samples at or before
+    // the one that maps to the host sample being produced. Its windowed-sinc
+    // prototype has a group delay of (kTaps - 1) / 2 engine samples, which is the
+    // only latency it adds. Report it in host samples so the host can compensate.
+    // The 48 kHz fast path is bit-transparent and reports exactly zero.
+    setLatencySamples ((int) std::lround (resampler.getLatencyInHostSamples()));
 }
 
 void PRA32ColorcoderAudioProcessor::releaseResources()
@@ -667,9 +652,11 @@ void PRA32ColorcoderAudioProcessor::handleMidiMessage (const juce::MidiMessage& 
         const int value = msg.getControllerValue();
 
         // --- Program Change by CC (CC112..CC119) -----------------------------
-        // Forwarding these to the engine lets it perform the program change
-        // itself on the 0->1 gate. We must not call program_change() again, but
-        // we do enqueue the deferred APVTS/UI/browser sync.
+        // The engine's internal program_change() ROM is not the plugin's preset
+        // authority, so these controllers are not forwarded to the engine.
+        // Instead the 0->1 gate is detected here and the canonical factory table
+        // is applied through exactly the same engine path as a MIDI Program
+        // Change. The deferred APVTS/UI/browser sync is enqueued as before.
         const int pcByCcIndex = PRA32MidiState::pcByCcProgramIndex (controller);
 
         if (pcByCcIndex >= 0)
@@ -677,10 +664,11 @@ void PRA32ColorcoderAudioProcessor::handleMidiMessage (const juce::MidiMessage& 
             const int previousValue = pcByCcValues[(size_t) pcByCcIndex];
             pcByCcValues[(size_t) pcByCcIndex] = value;
 
-            synthWrapper->synth.control_change ((uint8_t) controller, (uint8_t) value);
-
             if (PRA32MidiState::pcByCcTriggers (previousValue, value))
+            {
+                applyProgramToEngine (pcByCcIndex);
                 queueProgramChange (pcByCcIndex);
+            }
 
             return;
         }
@@ -765,9 +753,6 @@ void PRA32ColorcoderAudioProcessor::flushDeferredUpdates()
     const bool hasProgram = program.sequence != PRA32MidiState::kNoSequence
                             && PRA32MidiState::isValidFactoryProgram (program.program);
 
-    if (hasProgram)
-        ensureFactoryPresetCache();
-
     const int count = (int) paramBindings.size();
 
     {
@@ -784,8 +769,8 @@ void PRA32ColorcoderAudioProcessor::flushDeferredUpdates()
             const auto obs = parameterMailbox.observe (i);
 
             const int programValue =
-                (hasProgram && i < (int) factoryPresetValues.size())
-                    ? factoryPresetValues[(size_t) i][(size_t) program.program]
+                (hasProgram && i < FactoryPrograms::kParameterCount)
+                    ? FactoryPrograms::valueFor (i, program.program)
                     : -1;
 
             const auto resolution = PRA32MidiState::resolveDeferredParameter (

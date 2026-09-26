@@ -1,7 +1,7 @@
 #pragma once
 
 // -----------------------------------------------------------------------------
-// PRA32-U2 output resampler (Milestone B).
+// PRA32-U2 output resampler (Milestone B / B.1).
 //
 // The embedded PRA32-U2 engine is authored entirely at a fixed 48 kHz. Its
 // oscillator tables, EG/LFO rates, chorus delay line and feedback delay length
@@ -14,23 +14,37 @@
 //
 // Behaviour:
 //   * host == 48000 Hz  -> passthrough (one engine sample per host sample,
-//                          no filtering, no phase accumulator, bit-transparent)
-//   * host  > 48000 Hz  -> interpolation (suppresses the images of the 48 kHz
-//                          stream that would otherwise fold into the output)
-//   * host  < 48000 Hz  -> band-limited decimation (anti-alias filtering before
-//                          dropping samples; important for 48k -> 44.1k)
+//                          no filtering, no phase accumulator, bit-transparent,
+//                          zero added latency)
+//   * host  > 48000 Hz  -> causal interpolation
+//   * host  < 48000 Hz  -> causal band-limited decimation
+//
+// Causal design (Milestone B.1)
+// -----------------------------
+// Earlier revisions used a *symmetric* windowed-sinc kernel centred on the
+// current engine sample, which forced the wrapper to synthesise engine samples
+// belonging to the future (up to kTaps/2 ahead). That broke sample-accurate
+// MIDI: a Note On / CC / Program Change applied at host sample N could already
+// have been "heard" by engine samples the kernel had pre-rendered past N.
+//
+// The kernel is therefore re-phased to be strictly causal: output sample m is
+//
+//     y[m] = sum_{j=0}^{kTaps-1} e[readIndex - j] * h(j + frac)
+//
+// where readIndex + frac is the fractional engine position of host sample m and
+// h is the same windowed-sinc (Kaiser) prototype, now supported on [0, kTaps).
+// Only the current and past engine samples are ever requested, so an event
+// applied at host sample N can never influence output produced before N.
+//
+// The prototype is linear phase with group delay (kTaps - 1) / 2 engine
+// samples. That delay is the added latency reported to the host, converted to
+// host samples (zero on the 48 kHz fast path).
 //
 // Filter: windowed-sinc (Kaiser window) evaluated as a polyphase bank with a
 // precomputed coefficient table. All coefficients and buffers are allocated in
 // prepare(); process() performs no allocation, locks or I/O. Phase/history are
 // carried across processBlock() boundaries, so there are no discontinuities at
 // block edges.
-//
-// Latency: the wrapper *synthesises* the engine samples it needs, pulling them
-// on demand during the same host sample's computation. A MIDI event applied
-// before a host sample is therefore already reflected by the engine samples the
-// kernel interpolates for that same sample. The resampler adds no algorithmic
-// input/output latency and the plugin reports zero additional latency.
 // -----------------------------------------------------------------------------
 
 #include <algorithm>
@@ -64,6 +78,10 @@ public:
     // edge at ~0.99 * hostNyquist for the 48k -> 44.1k case.
     static constexpr double kDownMargin = 0.97;
 
+    // Linear-phase prototype group delay, in engine samples. This is the
+    // algorithmic delay the causal kernel adds to the engine stream.
+    static constexpr double kGroupDelayEngineSamples = (double) (kTaps - 1) / 2.0;
+
     Resampler() = default;
 
     void prepare (double newHostSampleRate)
@@ -79,9 +97,9 @@ public:
 
         buildTable();
 
-        // Ring must hold the whole filter window plus room for the write pointer
-        // to advance during one output step (downsampling pulls >1 sample).
-        int needed = kTaps + 8;
+        // Ring must hold the whole filter window plus room for the read pointer
+        // to advance during one output step (downsampling pulls > 1 sample).
+        int needed = kTaps + 64;
         ringSize = 1;
         while (ringSize < needed)
             ringSize <<= 1;
@@ -105,13 +123,24 @@ public:
     bool   isPassthrough() const noexcept { return passthrough; }
     double getStep()       const noexcept { return step; }
 
-    // The kernel is causal within the synthesis model; reported separately for
-    // completeness. Always zero for this design.
-    double getLatencyInHostSamples() const noexcept { return 0.0; }
+    // The group delay of the causal prototype, expressed in engine samples.
+    double getLatencyInEngineSamples() const noexcept
+    {
+        return passthrough ? 0.0 : kGroupDelayEngineSamples;
+    }
+
+    // Added latency in host samples: the engine-sample group delay scaled by the
+    // host/engine rate ratio. Exactly zero on the bit-transparent 48 kHz path.
+    double getLatencyInHostSamples() const noexcept
+    {
+        return passthrough ? 0.0
+                           : kGroupDelayEngineSamples * (hostSampleRate / kEngineSampleRate);
+    }
 
     // Produces one host-rate output sample. `pullEngine` is a nullary callable
-    // returning an engine-rate Sample (in [-1, 1]); the resampler pulls as many
-    // engine samples as the current ratio requires.
+    // returning an engine-rate Sample (in [-1, 1]); the resampler pulls engine
+    // samples strictly as the current/past engine index requires. It never
+    // requests an engine sample beyond the one that maps to this output sample.
     template <typename PullEngine>
     inline Sample process (PullEngine&& pullEngine)
     {
@@ -123,19 +152,17 @@ public:
 
         int phase = (int) (frac * (double) kPhases + 0.5);
 
-        long long readBase = base;
+        long long readIndex = base;
 
         if (phase >= kPhases)
         {
             phase = 0;
-            ++readBase;
+            ++readIndex;
         }
 
-        // Ensure the history holds every sample the kernel needs, including the
-        // "future" taps (which we can generate on demand because we own the
-        // synth, not an input stream).
-        const long long highestNeeded = readBase + (kTaps / 2);
-        while ((long long) writeIndex <= highestNeeded)
+        // Make sure the history contains the engine sample this output maps to.
+        // Never pull beyond it: the kernel is causal, so nothing later is used.
+        while ((long long) writeIndex <= readIndex)
         {
             const Sample s = pullEngine();
             historyL[(size_t) writeIndex & (size_t) ringMask] = s.l;
@@ -143,28 +170,23 @@ public:
             ++writeIndex;
         }
 
-        const long long first = readBase - (kTaps / 2) + 1;
         const float* coeffs = &table[(size_t) phase * (size_t) kTaps];
 
         float accL = 0.0f;
         float accR = 0.0f;
 
-        for (int i = 0; i < kTaps; ++i)
+        long long index = readIndex;
+
+        for (int j = 0; j < kTaps; ++j)
         {
-            const long long index = first + (long long) i;
-
-            float xl = 0.0f;
-            float xr = 0.0f;
-
             if (index >= 0)
             {
                 const size_t slot = (size_t) index & (size_t) ringMask;
-                xl = historyL[slot];
-                xr = historyR[slot];
+                accL += historyL[slot] * coeffs[j];
+                accR += historyR[slot] * coeffs[j];
             }
 
-            accL += xl * coeffs[i];
-            accR += xr * coeffs[i];
+            --index;
         }
 
         outputTime += step;
@@ -219,8 +241,9 @@ private:
         else
             cutoff = 0.5 * ratio * kDownMargin;
 
-        const double i0Beta = besselI0 (kKaiserBeta);
-        const int    half   = kTaps / 2;
+        const double i0Beta  = besselI0 (kKaiserBeta);
+        const double centre  = kGroupDelayEngineSamples;   // (kTaps - 1) / 2
+        const double halfWin = (double) kTaps / 2.0;
 
         table.assign ((size_t) kPhases * (size_t) kTaps, 0.0f);
 
@@ -231,21 +254,23 @@ private:
 
             double sum = 0.0;
 
-            for (int i = 0; i < kTaps; ++i)
+            for (int j = 0; j < kTaps; ++j)
             {
-                const double tau = (double) (i - half + 1) - frac;
+                // Causal prototype sampled at x = j + frac, x in [0, kTaps).
+                const double x  = (double) j + frac;
+                const double tau = x - centre;
 
                 double h = 0.0;
 
-                if (std::abs (tau) < (double) half)
+                if (std::abs (tau) < halfWin)
                 {
-                    const double u   = tau / (double) half;
+                    const double u   = tau / halfWin;
                     const double win = besselI0 (kKaiserBeta * std::sqrt (std::max (0.0, 1.0 - u * u)))
                                        / i0Beta;
                     h = 2.0 * cutoff * sinc (2.0 * cutoff * tau) * win;
                 }
 
-                row[i] = (float) h;
+                row[j] = (float) h;
                 sum += h;
             }
 
@@ -255,8 +280,8 @@ private:
             {
                 const float inv = (float) (1.0 / sum);
 
-                for (int i = 0; i < kTaps; ++i)
-                    row[i] *= inv;
+                for (int j = 0; j < kTaps; ++j)
+                    row[j] *= inv;
             }
         }
     }

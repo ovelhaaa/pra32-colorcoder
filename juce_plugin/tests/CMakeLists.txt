@@ -91,6 +91,7 @@ if (TARGET juce::juce_audio_processors)
         JucePlugin_IsMidiEffect=0
         JucePlugin_IsSynth=1
         "JucePlugin_Name=\"Tonecoder TC-32\""
+        "PRA32_REPO_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}/../..\""
     )
 
     target_include_directories(pra32_plugin_tests PRIVATE

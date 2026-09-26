@@ -327,7 +327,95 @@ void testPassthroughIdentity()
 }
 
 // -----------------------------------------------------------------------------
-// 2. Continuity across processBlock boundaries
+// 2. Causal kernel: no engine sample from the future is ever consumed
+// -----------------------------------------------------------------------------
+void testCausality()
+{
+    std::printf ("resampler is causal (never pulls engine samples from the future)...\n");
+
+    const double rates[] = { 44100.0, 48000.0, 96000.0, 192000.0 };
+    const int    impulseIndex = 1000;
+
+    for (double fs : rates)
+    {
+        Resampler r;
+        r.prepare (fs);
+
+        long long idx = 0;
+        auto pull = [&]() -> Resampler::Sample
+        {
+            const float v = (idx == impulseIndex) ? 1.0f : 0.0f;
+            ++idx;
+            return { v, v };
+        };
+
+        const int total = impulseIndex * 4 + 512;
+        int firstNonZero = -1;
+
+        for (int i = 0; i < total; ++i)
+        {
+            const float v = r.process (pull).l;
+
+            if (firstNonZero < 0 && std::abs (v) > 1.0e-6f)
+                firstNonZero = i;
+        }
+
+        // The impulse enters the causal window only once the output maps to an
+        // engine position at or past it.
+        const int expected = (int) std::ceil ((double) impulseIndex * fs / kEngine);
+
+        std::printf ("  %7.0f Hz : first response=%d expected>=%d\n", fs, firstNonZero, expected);
+
+        CHECK (firstNonZero >= 0);
+        CHECK (firstNonZero >= expected);
+        CHECK (firstNonZero <= expected + 2);
+    }
+}
+
+// -----------------------------------------------------------------------------
+// 3. Latency reporting and fast path
+// -----------------------------------------------------------------------------
+void testLatencyReporting()
+{
+    std::printf ("reported SRC latency matches the causal group delay...\n");
+
+    const double rates[] = { 44100.0, 48000.0, 96000.0, 192000.0 };
+
+    for (double fs : rates)
+    {
+        Resampler r;
+        r.prepare (fs);
+
+        const double expected = (std::abs (fs - kEngine) < 1.0e-3)
+                                    ? 0.0
+                                    : Resampler::kGroupDelayEngineSamples * fs / kEngine;
+        const double got = r.getLatencyInHostSamples();
+
+        std::printf ("  %7.0f Hz : latency=%.3f host samples (engine group delay=%.1f)\n",
+                     fs, got, r.getLatencyInEngineSamples());
+
+        CHECK (std::abs (got - expected) < 1.0e-6);
+        CHECK (r.isPassthrough() == (std::abs (fs - kEngine) < 1.0e-3));
+    }
+
+    // Re-preparing at a new rate must update the reported latency.
+    Resampler r;
+    r.prepare (44100.0);
+    const double at441 = r.getLatencyInHostSamples();
+    r.prepare (96000.0);
+    const double at96 = r.getLatencyInHostSamples();
+
+    CHECK (at441 > 0.0);
+    CHECK (at96 > at441);
+
+    // releaseResources()/prepareToPlay() cycle: a fresh prepare must leave no
+    // residual history or stale phase.
+    r.prepare (44100.0);
+    CHECK (std::abs (r.getLatencyInHostSamples() - at441) < 1.0e-9);
+}
+
+// -----------------------------------------------------------------------------
+// 4. Continuity across processBlock boundaries
 // -----------------------------------------------------------------------------
 void testBlockContinuity()
 {
@@ -447,13 +535,20 @@ void testTimingConsistency()
         for (int i = 0; i < (int) y.size(); ++i)
             if (std::abs (y[(size_t) i]) > 0.05) { onset = i; break; }
 
-        const double onsetSeconds = onset >= 0 ? (double) onset / fs : -1.0;
+        // Compensate for the SRC group delay each rate reports: the *reported*
+        // onset (event + latency) must be sample-rate invariant, while the raw
+        // sample index is intentionally earlier on the zero-latency 48 kHz path.
+        Resampler probe;
+        probe.prepare (fs);
+        const double latency = probe.getLatencyInHostSamples();
+
+        const double onsetSeconds = onset >= 0 ? ((double) onset - latency) / fs : -1.0;
 
         if (ri == 0) referenceOnset = onsetSeconds;
 
         const double errorMs = std::abs (onsetSeconds - referenceOnset) * 1000.0;
-        std::printf ("  %7.0f Hz : onset=%d (%.6f s) error=%.4f ms\n",
-                     fs, onset, onsetSeconds, errorMs);
+        std::printf ("  %7.0f Hz : onset=%d (%.6f s after %.1f-sample latency) error=%.4f ms\n",
+                     fs, onset, onsetSeconds, latency, errorMs);
 
         // Onset is detected within a sample or two of the reference; allow
         // 0.2 ms which is far tighter than any musical perception threshold.
@@ -590,7 +685,9 @@ void testSpectralQuality()
     }
 
     // (c) Upsampling: interpolation error against the analytic sine must be
-    //     tiny and far below the old linear stage.
+    //     tiny and far below the old linear stage. The causal kernel adds a
+    //     known group delay, so the reference is evaluated at the same delayed
+    //     engine time the resampler produces.
     {
         const double rates[] = { 96000.0, 192000.0 };
 
@@ -598,6 +695,8 @@ void testSpectralQuality()
         {
             Resampler r;
             r.prepare (fs);
+
+            const double step = kEngine / fs;
 
             long long idx = 0;
             auto gen = [&] (double t) { return (float) std::sin (2.0 * kPi * 10000.0 * t); };
@@ -613,7 +712,9 @@ void testSpectralQuality()
             double errNew = 0.0;
             for (int i = 0; i < n; ++i)
             {
-                const double ref = std::sin (2.0 * kPi * 10000.0 * (double) i / fs);
+                const double outTime = (double) (9600 + i) * step;
+                const double engineTime = outTime - Resampler::kGroupDelayEngineSamples;
+                const double ref = std::sin (2.0 * kPi * 10000.0 * engineTime / kEngine);
                 const double v = (double) r.process (pull).l;
                 errNew += (v - ref) * (v - ref);
             }
@@ -759,6 +860,8 @@ int main()
     std::printf ("== PRA32-U2 resampler / sample-rate tests ==\n");
 
     testPassthroughIdentity();
+    testCausality();
+    testLatencyReporting();
     testBlockContinuity();
     testPitchConsistency();
     testTimingConsistency();

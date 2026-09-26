@@ -78,6 +78,11 @@ public:
     // -1 when the current patch came from a JSON file / host session.
     int getCurrentFactoryPreset() const noexcept { return currentFactoryPreset; }
 
+    // Verification hook (tests): the value the engine currently holds for the
+    // parameter at `parameterIndex` (SynthParameters order), or -1 if out of
+    // range. Reads the engine's controller table only; no allocation.
+    int getEngineParameterValue (int parameterIndex);
+
     // True when any parameter differs from the patch captured at load time.
     bool isCurrentPatchEdited() const;
 
@@ -158,19 +163,15 @@ private:
     void handleMidiMessage (const juce::MidiMessage& msg);
 
     // --- Preset pipeline -----------------------------------------------------
-    // Realtime path: mutate the engine only. No allocation, safe on the audio
-    // thread (used for sample-accurate MIDI Program Change).
+    // Realtime path: mutate the engine only, applying every parameter of the
+    // canonical FactoryPrograms::kRows table through control_change(). No
+    // allocation, no JSON parsing; safe on the audio thread (used for
+    // sample-accurate MIDI Program Change).
     void applyProgramToEngine (int program) noexcept;
 
     // Message-thread path: mirror a preset onto the APVTS, the host, the preset
     // browser and the modified-state bookkeeping.
     void mirrorProgramToAPVTSAndUI (int program);
-
-    // Lazily parses FactoryPresets::json() once into a [param][program] table so
-    // a program sync no longer re-parses JSON on every change.
-    void ensureFactoryPresetCache();
-    std::vector<std::array<int, PRA32MidiState::kFactoryProgramCount>> factoryPresetValues;
-    bool factoryPresetCacheReady = false;
 
     void timerCallback() override;
 

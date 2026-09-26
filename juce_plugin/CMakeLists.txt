@@ -43,7 +43,7 @@ target_sources(PRA32ColorcoderPlugin PRIVATE
     Source/PRA32Components.h
     Source/PRA32ParamLogic.h
     Source/PRA32Resampler.h
-    Source/FactoryPresets.h
+    Source/FactoryProgramTable.h
     Source/SynthParameters.cpp
     Source/SynthParameters.h
 )
