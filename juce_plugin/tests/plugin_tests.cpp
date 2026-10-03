@@ -23,6 +23,7 @@
 #include <vector>
 #include <cstdlib>
 #include <new>
+#include <thread>
 
 #ifndef PRA32_REPO_ROOT
 #define PRA32_REPO_ROOT "."
@@ -821,6 +822,106 @@ void testDirtyRecallAndInvalidState()
     }
 }
 
+void testDeferredStateSnapshots()
+{
+    std::printf ("state snapshots on a host worker preserve committed patch and deferred MIDI...\n");
+    PRA32ColorcoderAudioProcessor p;
+    p.prepareToPlay (48000, 64); p.loadPreset (7);
+    juce::MidiBuffer midi;
+    midi.addEvent (juce::MidiMessage::programChange (1, 8), 0);
+    midi.addEvent (juce::MidiMessage::controllerEvent (1, 74, 99), 1);
+    renderBlock (p, 64, midi);
+    // A newer host edit beats the pending CC, without a message-loop flush.
+    setParam (p, "filterCutoff", 2);
+    const auto committed = snapshot (p);
+    std::array<juce::MemoryBlock, 16> states;
+    std::thread reader ([&] { for (auto& state : states) p.getStateInformation (state); });
+    reader.join();
+    CHECK (snapshot (p) == committed);
+    CHECK (p.getCurrentFactoryPreset() == 7);
+    PRA32ColorcoderAudioProcessor restored;
+    for (auto& state : states)
+    {
+        restored.setStateInformation (state.getData(), (int) state.getSize());
+        CHECK (snapshot (restored) == committed);
+        CHECK (restored.getCurrentFactoryPreset() == 7);
+        CHECK (restored.isCurrentPatchEdited());
+    }
+    p.flushDeferredUpdates();
+    CHECK (p.getCurrentFactoryPreset() == 8); // saving did not consume the PC
+    CHECK ((int) p.getAPVTS().getRawParameterValue ("filterCutoff")->load() == 2);
+    CHECK (p.isCurrentPatchEdited());
+    p.loadPresetFromJson ("{}"); setParam (p, "filterCutoff", 3);
+    std::thread userReader ([&] { p.getStateInformation (states[0]); }); userReader.join();
+    restored.setStateInformation (states[0].getData(), (int) states[0].getSize());
+    CHECK (restored.getCurrentFactoryPreset() == -1);
+    CHECK (restored.isCurrentPatchEdited());
+    setParam (restored, "filterCutoff", SynthParameters::getParameters()[10].def);
+    CHECK (! restored.isCurrentPatchEdited());
+
+    // No message loop runs here. Concurrent factory transactions must never
+    // expose a mixed parameter column / preset index / baseline to a reader.
+    p.loadPreset (0);
+    std::atomic<bool> valid { true };
+    std::atomic<bool> started { false };
+    std::thread stressReader ([&]
+    {
+        started.store (true);
+        for (int pass = 0; pass < 500; ++pass)
+        {
+            juce::MemoryBlock data; p.getStateInformation (data);
+            auto xml = juce::AudioProcessor::getXmlFromBinary (data.getData(), (int) data.getSize());
+            if (! xml) { valid.store (false); continue; }
+            const auto tree = juce::ValueTree::fromXml (*xml);
+            const int program = (int) tree.getProperty ("uiPreset");
+            const auto baseline = juce::JSON::parse (tree.getProperty ("patchBaseline").toString());
+            const auto* values = baseline.getArray();
+            const auto& params = SynthParameters::getParameters();
+            if (! PRA32MidiState::isValidFactoryProgram (program) || ! values
+                || values->size() != (int) params.size()) { valid.store (false); continue; }
+            for (size_t i = 0; i < params.size(); ++i)
+            {
+                const int expected = FactoryPrograms::valueFor ((int) i, program);
+                const int actual = (int) tree.getChildWithProperty ("id", params[i].id).getProperty ("value");
+                if (actual != expected || (int) (*values)[(int) i] != expected) valid.store (false);
+            }
+        }
+    });
+    while (! started.load()) std::this_thread::yield();
+    for (int pass = 0; pass < 500; ++pass) p.loadPreset (pass % p.getNumPrograms());
+    stressReader.join(); CHECK (valid.load());
+}
+
+double signalRms (const std::vector<float>& signal);
+
+void testKeyboardReprepare()
+{
+    std::printf ("keyboard queue, stale offs, overflow and normal input after reprepare...\n");
+    PRA32ColorcoderAudioProcessor p;
+    p.prepareToPlay (48000, 64); setSustainPatch (p, 127);
+    setParam (p, "relEqDcy", 0); setParam (p, "chorusMix", 0); setParam (p, "delayDepth", 0);
+    p.keyboardState.noteOn (1, 60, 1.0f);
+    p.prepareToPlay (48000, 64);
+    CHECK (signalRms (renderBlock (p, 4096)) == 0);
+    p.keyboardState.noteOff (1, 60, 0); // stale off queued before prepare
+    p.prepareToPlay (48000, 64);
+    juce::MidiBuffer fresh; fresh.addEvent (juce::MidiMessage::noteOn (1, 60, (juce::uint8) 127), 0);
+    CHECK (signalRms (renderBlock (p, 4096, fresh)) > .01);
+    // Overflow would panic and discard the next UI note if it survived.
+    for (int i = 0; i < 300; ++i)
+    {
+        p.keyboardState.noteOn (1, 61, 1.0f);
+        p.keyboardState.noteOff (1, 61, 0);
+    }
+    p.prepareToPlay (96000, 64);
+    CHECK (signalRms (renderBlock (p, 4096)) == 0);
+    p.keyboardState.noteOn (1, 62, 1.0f);
+    CHECK (signalRms (renderBlock (p, 8192)) > .01);
+    p.keyboardState.noteOff (1, 62, 0);
+    renderBlock (p, 16000);
+    CHECK (signalRms (renderBlock (p, 16000)) < 1.0e-4);
+}
+
 void testJsonValidation()
 {
     std::printf ("JSON schema, legacy compatibility, transactional validation...\n");
@@ -1167,6 +1268,8 @@ int main()
 
     std::printf ("== PRA32-U2 plugin (JUCE) tests ==\n");
 
+    testDeferredStateSnapshots();
+    testKeyboardReprepare();
     testDirtyRecallAndInvalidState();
     testJsonValidation();
     testUiCoverageAndLifecycle();

@@ -87,6 +87,7 @@ void PRA32ColorcoderAudioProcessor::setUiProperty (const juce::Identifier& key,
 
 void PRA32ColorcoderAudioProcessor::capturePatchBaseline()
 {
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     patchBaseline.clear();
 
     for (const auto& p : SynthParameters::getParameters())
@@ -96,6 +97,7 @@ void PRA32ColorcoderAudioProcessor::capturePatchBaseline()
 
 bool PRA32ColorcoderAudioProcessor::isCurrentPatchEdited() const
 {
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     const auto& params = SynthParameters::getParameters();
 
     if (patchBaseline.size() != params.size())
@@ -292,7 +294,7 @@ int PRA32ColorcoderAudioProcessor::getNumPrograms()
 
 int PRA32ColorcoderAudioProcessor::getCurrentProgram()
 {
-    return juce::jmax (0, juce::jmin (PRA32MidiState::kFactoryProgramCount - 1, currentFactoryPreset));
+    return juce::jmax (0, juce::jmin (PRA32MidiState::kFactoryProgramCount - 1, currentFactoryPreset.load()));
 }
 
 void PRA32ColorcoderAudioProcessor::setCurrentProgram (int index)
@@ -313,6 +315,7 @@ void PRA32ColorcoderAudioProcessor::changeProgramName (int index, const juce::St
 
 void PRA32ColorcoderAudioProcessor::loadPreset(int index)
 {
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     if (! PRA32MidiState::isValidFactoryProgram (index))
         return;
 
@@ -340,6 +343,7 @@ void PRA32ColorcoderAudioProcessor::writeProgramValuesToAPVTS (int program)
 
 void PRA32ColorcoderAudioProcessor::captureBaselineFromProgram (int program)
 {
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     patchBaseline.clear();
 
     if (! PRA32MidiState::isValidFactoryProgram (program))
@@ -355,16 +359,18 @@ void PRA32ColorcoderAudioProcessor::captureBaselineFromProgram (int program)
 
 void PRA32ColorcoderAudioProcessor::finishProgramBookkeeping (int program)
 {
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     // The baseline is the pure factory column, so any host/GUI value that won
     // after the program change is correctly reported as an edit.
     captureBaselineFromProgram (program);
     currentFactoryPreset = program;
-    setUiProperty ("uiPreset", currentFactoryPreset);
+    setUiProperty ("uiPreset", currentFactoryPreset.load());
     sendChangeMessage();
 }
 
 void PRA32ColorcoderAudioProcessor::mirrorProgramToAPVTSAndUI (int program)
 {
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     if (! PRA32MidiState::isValidFactoryProgram (program))
         return;
 
@@ -478,6 +484,7 @@ void PRA32ColorcoderAudioProcessor::loadPresetFromJson(const juce::String& jsonS
         values.push_back (next);
     }
 
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     discardPendingParameterUpdates();
     clearPendingProgram();
     const DeferredWriteScope scope (applyDeferredInProgress);
@@ -514,6 +521,15 @@ void PRA32ColorcoderAudioProcessor::prepareToPlay (double sampleRate, int sample
     // All filter/history memory is reserved here (never on the audio thread).
     // Hosts call prepare with rendering stopped. Recreate the engine here to
     // reset held notes, envelopes and FX histories, while preserving the APVTS patch.
+    {
+        // Rendering is stopped here. Exclude the UI producer while resetting
+        // the FIFO storage; the audio consumer never takes this lock.
+        const juce::ScopedLock producerLock (keyboardProducerLock);
+        keyboardFifo.reset();
+        keyboardEvents.fill ({});
+        keyboardOverflow.store (false);
+        for (auto& note : hostKeyboardNotes) note.store (0);
+    }
     synthWrapper = std::make_unique<PRA32Wrapper>();
     synthWrapper->synth.initialize();
     for (auto& binding : paramBindings)
@@ -827,6 +843,7 @@ void PRA32ColorcoderAudioProcessor::discardPendingParameterUpdates() noexcept
 
 void PRA32ColorcoderAudioProcessor::flushDeferredUpdates()
 {
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     // Unified deferred timeline: a Program Change is a global event, a MIDI CC
     // is a per-parameter event and a GUI/host edit is a per-parameter event.
     // They all carry a sequence from the same generator, so for each parameter
@@ -902,6 +919,7 @@ void PRA32ColorcoderAudioProcessor::flushDeferredUpdates()
 
 void PRA32ColorcoderAudioProcessor::queueKeyboardEvent (int note, int velocity, bool on)
 {
+    const juce::ScopedLock producerLock (keyboardProducerLock);
     if (mirroringKeyboard) return;
     int start1, size1, start2, size2;
     keyboardFifo.prepareToWrite (1, start1, size1, start2, size2);
@@ -952,9 +970,11 @@ juce::AudioProcessorEditor* PRA32ColorcoderAudioProcessor::createEditor()
 //==============================================================================
 void PRA32ColorcoderAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    flushDeferredUpdates();
+    // Save the committed APVTS patch. Pending MIDI remains deferred until the
+    // message-thread timer runs; saving must not notify the host or mutate UI.
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     auto state = apvts.copyState();
-    state.setProperty ("uiPreset", currentFactoryPreset, nullptr);
+    state.setProperty ("uiPreset", currentFactoryPreset.load(), nullptr);
     juce::Array<juce::var> baseline;
     for (int value : patchBaseline) baseline.add (value);
     state.setProperty ("patchBaseline", juce::JSON::toString (juce::var (baseline), true), nullptr);
@@ -964,6 +984,7 @@ void PRA32ColorcoderAudioProcessor::getStateInformation (juce::MemoryBlock& dest
 
 void PRA32ColorcoderAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
 
     if (xmlState != nullptr)

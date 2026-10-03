@@ -77,7 +77,7 @@ public:
     static juce::String factoryPresetName (int index);
 
     // -1 when the current patch came from a JSON file / host session.
-    int getCurrentFactoryPreset() const noexcept { return currentFactoryPreset; }
+    int getCurrentFactoryPreset() const noexcept { return currentFactoryPreset.load(); }
 
     // Verification hook (tests): the value the engine currently holds for the
     // parameter at `parameterIndex` (SynthParameters order), or -1 if out of
@@ -100,6 +100,8 @@ private:
     // Message-thread keyboard producer / audio-thread consumer. No MidiBuffer
     // insertion or MidiKeyboardState lock is needed in processBlock.
     struct KeyboardEvent { int note = 0; int velocity = 0; bool on = false; };
+    // Producer/lifecycle only; processBlock never acquires this lock.
+    juce::CriticalSection keyboardProducerLock;
     juce::AbstractFifo keyboardFifo { 256 };
     std::array<KeyboardEvent, 256> keyboardEvents {};
     std::atomic<bool> keyboardOverflow { false };
@@ -195,7 +197,10 @@ private:
     // takes ownership of the parameters.
     void discardPendingParameterUpdates() noexcept;
 
-    int currentFactoryPreset = 0;
+    // Serialisation and non-realtime preset transactions share this recursive lock.
+    // Parameter listeners and all engine/audio paths remain lock-free.
+    mutable juce::CriticalSection stateSnapshotLock;
+    std::atomic<int> currentFactoryPreset { 0 };
     std::vector<int> patchBaseline;
     void capturePatchBaseline();
 
