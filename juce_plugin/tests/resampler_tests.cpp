@@ -333,7 +333,7 @@ void testCausality()
 {
     std::printf ("resampler is causal (never pulls engine samples from the future)...\n");
 
-    const double rates[] = { 44100.0, 48000.0, 96000.0, 192000.0 };
+    const double rates[] = { 44100.0, 48000.0, 88200.0, 96000.0, 176400.0, 192000.0 };
     const int    impulseIndex = 1000;
 
     for (double fs : rates)
@@ -379,7 +379,7 @@ void testLatencyReporting()
 {
     std::printf ("reported SRC latency matches the causal group delay...\n");
 
-    const double rates[] = { 44100.0, 48000.0, 96000.0, 192000.0 };
+    const double rates[] = { 44100.0, 48000.0, 88200.0, 96000.0, 176400.0, 192000.0 };
 
     for (double fs : rates)
     {
@@ -421,7 +421,7 @@ void testBlockContinuity()
 {
     std::printf ("resampler state is continuous across blocks...\n");
 
-    const double rates[] = { 44100.0, 48000.0, 96000.0, 192000.0 };
+    const double rates[] = { 44100.0, 48000.0, 88200.0, 96000.0, 176400.0, 192000.0 };
 
     for (double fs : rates)
     {
@@ -445,13 +445,13 @@ void testBlockContinuity()
         split.prepare (fs);
 
         std::vector<float> splitOut ((size_t) total);
-        const int blocks[] = { 16, 32, 64, 128, 256, 512, 1024, 2048 };
+        const int blocks[] = { 1, 16, 32, 64, 128, 256, 512, 1024, 2048 };
         int written = 0;
         int bi = 0;
 
         while (written < total)
         {
-            const int n = std::min (blocks[bi % 8], total - written);
+            const int n = std::min (blocks[bi % 9], total - written);
             ++bi;
 
             for (int i = 0; i < n; ++i)
@@ -480,14 +480,14 @@ void testPitchConsistency()
     struct NoteCase { int note; double expected; const char* name; };
     const NoteCase notes[] = { { 69, 440.0, "A4" }, { 60, 261.6255653, "C4" } };
 
-    const double rates[] = { 44100.0, 48000.0, 96000.0, 192000.0 };
+    const double rates[] = { 44100.0, 48000.0, 88200.0, 96000.0, 176400.0, 192000.0 };
 
     for (const auto& nc : notes)
     {
         double referenceCents = 0.0;
         double maxSpreadCents = 0.0;
 
-        for (int ri = 0; ri < 4; ++ri)
+        for (int ri = 0; ri < 6; ++ri)
         {
             const double fs = rates[ri];
             auto y = renderNote (fs, nc.note, (int) (fs * 0.5), (int) (fs * 0.05));
@@ -522,11 +522,11 @@ void testTimingConsistency()
 {
     std::printf ("timing is sample-rate invariant (onset + LFO period)...\n");
 
-    const double rates[] = { 44100.0, 48000.0, 96000.0, 192000.0 };
+    const double rates[] = { 44100.0, 48000.0, 88200.0, 96000.0, 176400.0, 192000.0 };
 
     double referenceOnset = -1.0;
 
-    for (int ri = 0; ri < 4; ++ri)
+    for (int ri = 0; ri < 6; ++ri)
     {
         const double fs = rates[ri];
         auto y = renderNote (fs, 69, (int) (fs * 0.25));
@@ -559,7 +559,7 @@ void testTimingConsistency()
     // Compare the period in seconds across rates.
     double referencePeriod = -1.0;
 
-    for (int ri = 0; ri < 4; ++ri)
+    for (int ri = 0; ri < 6; ++ri)
     {
         const double fs = rates[ri];
 
@@ -629,7 +629,7 @@ void testSpectralQuality()
 
     // (a) 1 kHz passband amplitude must be preserved at every rate.
     {
-        const double rates[] = { 44100.0, 48000.0, 96000.0, 192000.0 };
+        const double rates[] = { 44100.0, 48000.0, 88200.0, 96000.0, 176400.0, 192000.0 };
 
         for (double fs : rates)
         {
@@ -811,7 +811,7 @@ void testCpuCost()
 {
     std::printf ("approximate wrapper CPU cost (4 voices, chorus + delay)...\n");
 
-    const double rates[] = { 44100.0, 48000.0, 96000.0, 192000.0 };
+    const double rates[] = { 44100.0, 48000.0, 88200.0, 96000.0, 176400.0, 192000.0 };
 
     for (double fs : rates)
     {
@@ -853,12 +853,30 @@ void testCpuCost()
     }
 }
 
+void testPhaseRoundingNeverPullsFuture()
+{
+    std::printf ("phase rounding near 1 never pulls future engine samples...\n");
+    for (double fs : { 44100., 88200., 176400., 48000. / (1.0 - 1.0 / 2048.0) })
+    {
+        Resampler r; r.prepare (fs);
+        int pulled = 0;
+        for (int host = 0; host < 12000; ++host)
+        {
+            r.process ([&] { ++pulled; return Resampler::Sample {}; });
+            // One-sample FP allowance is forbidden here: the source may never
+            // run ahead of the exact current host time, including phase carry.
+            CHECK (pulled <= (int) std::floor (host * 48000. / fs) + 1);
+        }
+    }
+}
+
 } // namespace
 
 int main()
 {
     std::printf ("== PRA32-U2 resampler / sample-rate tests ==\n");
 
+    testPhaseRoundingNeverPullsFuture();
     testPassthroughIdentity();
     testCausality();
     testLatencyReporting();

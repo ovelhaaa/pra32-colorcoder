@@ -51,6 +51,14 @@ public:
     m_chorus_delay_time_control_effective = 64 << 6;
   }
 
+  // Bounded, allocation-free panic reset; retain effect settings/smoothing.
+  INLINE void silence() {
+    for (auto& channel : m_delay_buff)
+      for (auto& sample : channel) sample = 0;
+    m_prev_sample_to_push_0 = 0;
+    m_prev_sample_to_push_1 = 0;
+  }
+
   INLINE void set_chorus_depth(uint8_t controller_value) {
     if (controller_value < 126) {
       m_chorus_depth_control = controller_value << 6;

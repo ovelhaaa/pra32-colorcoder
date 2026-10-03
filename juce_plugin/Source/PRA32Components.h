@@ -67,7 +67,7 @@ public:
 
 private:
     SynthParamData param;
-    std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> attachment;
+    std::unique_ptr<juce::ParameterAttachment> attachment;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ToggleSwitch)
 };
@@ -136,7 +136,7 @@ private:
 // -----------------------------------------------------------------------------
 // ADSR envelope module: a live UI-only curve plus the four stage knobs.
 class EnvelopePanel : public juce::Component,
-                      private juce::AudioProcessorValueTreeState::Listener
+                      private juce::Timer
 {
 public:
     EnvelopePanel (juce::AudioProcessorValueTreeState& apvts,
@@ -149,7 +149,7 @@ public:
     void resized() override;
 
 private:
-    void parameterChanged (const juce::String& id, float newValue) override;
+    void timerCallback() override;
 
     juce::AudioProcessorValueTreeState& state;
     std::array<SynthParamData, 4> params;
@@ -164,7 +164,7 @@ private:
 // -----------------------------------------------------------------------------
 // UI-only filter magnitude sketch. Never touches the audio path.
 class FilterResponseGraph : public juce::Component,
-                            private juce::AudioProcessorValueTreeState::Listener
+                            private juce::Timer
 {
 public:
     FilterResponseGraph (juce::AudioProcessorValueTreeState& apvts, juce::Colour accent);
@@ -173,7 +173,7 @@ public:
     void paint (juce::Graphics&) override;
 
 private:
-    void parameterChanged (const juce::String& id, float newValue) override;
+    void timerCallback() override;
 
     juce::AudioProcessorValueTreeState& state;
     float cutoffValue = 127.0f;

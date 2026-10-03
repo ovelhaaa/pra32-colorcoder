@@ -150,15 +150,12 @@ public:
         const long long base = (long long) std::floor (outputTime);
         double frac = outputTime - (double) base;
 
-        int phase = (int) (frac * (double) kPhases + 0.5);
-
-        long long readIndex = base;
-
-        if (phase >= kPhases)
-        {
-            phase = 0;
-            ++readIndex;
-        }
+        // Nearest phase must never carry into the next engine sample. A
+        // fraction just below 1 may round to kPhases; clamp it rather than
+        // incrementing the read index (which would pull future engine state).
+        const int phase = std::min (kPhases - 1,
+                                   (int) (frac * (double) kPhases + 0.5));
+        const long long readIndex = base;
 
         // Make sure the history contains the engine sample this output maps to.
         // Never pull beyond it: the kernel is causal, so nothing later is used.

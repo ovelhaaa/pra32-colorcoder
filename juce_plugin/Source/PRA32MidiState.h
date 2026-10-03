@@ -338,7 +338,14 @@ inline void dispatchSampleAccurate (int numSamples, EventRange&& events,
             startSample = eventPosition;
         }
 
-        applyEvent (metadata.getMessage());
+        // The synth supports short channel messages only. Constructing a JUCE
+        // MidiMessage for long SysEx would allocate on the audio thread.
+        if constexpr (requires { metadata.numBytes; })
+        {
+            if (metadata.numBytes <= 3) applyEvent (metadata.getMessage());
+        }
+        else
+            applyEvent (metadata.getMessage());
     }
 
     if (startSample < numSamples)

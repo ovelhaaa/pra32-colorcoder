@@ -30,6 +30,7 @@ struct ParamBinding {
 
 class PRA32ColorcoderAudioProcessor  : public juce::AudioProcessor,
                                        public juce::ChangeBroadcaster,
+                                       private juce::MidiKeyboardState::Listener,
                                        private juce::AudioProcessorValueTreeState::Listener,
                                        private juce::Timer
 {
@@ -96,6 +97,19 @@ public:
     void flushDeferredUpdates();
 
 private:
+    // Message-thread keyboard producer / audio-thread consumer. No MidiBuffer
+    // insertion or MidiKeyboardState lock is needed in processBlock.
+    struct KeyboardEvent { int note = 0; int velocity = 0; bool on = false; };
+    juce::AbstractFifo keyboardFifo { 256 };
+    std::array<KeyboardEvent, 256> keyboardEvents {};
+    std::atomic<bool> keyboardOverflow { false };
+    std::array<std::atomic<int>, 128> hostKeyboardNotes {};
+    bool wasTransportPlaying = false; // audio thread only
+    bool mirroringKeyboard = false; // message thread only
+    void handleNoteOn (juce::MidiKeyboardState*, int, int, float) override;
+    void handleNoteOff (juce::MidiKeyboardState*, int, int, float) override;
+    void queueKeyboardEvent (int, int, bool);
+
     // -------------------------------------------------------------------------
     // Core Engine Instantiation
     // -------------------------------------------------------------------------
@@ -118,6 +132,8 @@ private:
     // audio path. Each entry carries a sequence and a GUI/host watermark so an
     // obsolete MIDI value can never overwrite a newer event.
     PRA32MidiState::PendingParameterMailbox parameterMailbox;
+    std::atomic<uint64_t> parameterResetGeneration { 0 };
+    uint64_t audioParameterResetGeneration = 0; // audio thread only
 
     // Last value seen on each PC-by-CC controller (CC112..119). Audio-thread
     // only; used to detect the engine's 0->1 program-change gate.

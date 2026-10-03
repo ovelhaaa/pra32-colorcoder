@@ -192,6 +192,7 @@ ParameterKnob::ParameterKnob (const SynthParamData& info,
                               juce::AudioProcessorValueTreeState& apvts)
     : param (info)
 {
+    setComponentID (info.id);
     setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
     setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
     setRange ((double) param.min, (double) param.max, 1.0);
@@ -251,6 +252,7 @@ SteppedSelector::SteppedSelector (const SynthParamData& info,
                                   juce::AudioProcessorValueTreeState& apvts)
     : param (info)
 {
+    setComponentID (info.id);
     setSliderStyle (juce::Slider::RotaryHorizontalVerticalDrag);
     setTextBoxStyle (juce::Slider::NoTextBox, false, 0, 0);
     setRange ((double) param.min, (double) param.max, 1.0);
@@ -393,12 +395,23 @@ ToggleSwitch::ToggleSwitch (const SynthParamData& info,
                             juce::AudioProcessorValueTreeState& apvts)
     : juce::Button (info.id), param (info)
 {
+    setComponentID (info.id);
     setClickingTogglesState (true);
     setWantsKeyboardFocus (true);
     setToggleState ((double) param.def >= 64.0, juce::dontSendNotification);
 
-    attachment = std::make_unique<juce::AudioProcessorValueTreeState::ButtonAttachment> (
-        apvts, param.id, *this);
+    // ButtonAttachment writes denormalised 0/1 and assumes a boolean parameter.
+    // These historical APVTS parameters are MIDI-range ints: ON must be 127.
+    if (auto* parameter = apvts.getParameter (param.id))
+    {
+        attachment = std::make_unique<juce::ParameterAttachment> (*parameter,
+            [this] (float value) { setToggleState (value >= 64.0f, juce::dontSendNotification); });
+        onClick = [this]
+        {
+            attachment->setValueAsCompleteGesture ((float) (getToggleState() ? param.max : param.min));
+        };
+        attachment->sendInitialUpdate();
+    }
 }
 
 juce::String ToggleSwitch::getTooltip()
@@ -689,27 +702,28 @@ EnvelopePanel::EnvelopePanel (juce::AudioProcessorValueTreeState& apvts,
     {
         auto* knob = knobs.add (new ParameterKnob (params[i], apvts));
         addAndMakeVisible (knob);
-        state.addParameterListener (params[i].id, this);
+
 
         if (auto* value = state.getRawParameterValue (params[i].id))
             props[i] = PRA32ValueFormatter::curveProportion (params[i],
                                                              (int) value->load());
     }
+    startTimerHz (30);
 }
 
-EnvelopePanel::~EnvelopePanel()
-{
-    for (const auto& p : params)
-        state.removeParameterListener (p.id, this);
-}
+EnvelopePanel::~EnvelopePanel() { stopTimer(); }
 
-void EnvelopePanel::parameterChanged (const juce::String& id, float newValue)
+void EnvelopePanel::timerCallback()
 {
+    bool changed = false;
     for (int i = 0; i < 4; ++i)
-        if (params[i].id == id)
-            props[i] = PRA32ValueFormatter::curveProportion (params[i], (int) newValue);
-
-    repaint();
+        if (auto* v = state.getRawParameterValue (params[i].id))
+        {
+            const float next = PRA32ValueFormatter::curveProportion (params[i], (int) v->load());
+            changed = changed || props[i] != next;
+            props[i] = next;
+        }
+    if (changed) repaint();
 }
 
 void EnvelopePanel::paint (juce::Graphics& g)
@@ -764,29 +778,23 @@ FilterResponseGraph::FilterResponseGraph (juce::AudioProcessorValueTreeState& ap
                                           juce::Colour acc)
     : state (apvts), accent (acc)
 {
-    state.addParameterListener ("filterCutoff", this);
-    state.addParameterListener ("filterReso", this);
-    state.addParameterListener ("filterMode", this);
+    startTimerHz (30);
 
     if (auto* v = state.getRawParameterValue ("filterCutoff")) cutoffValue = v->load();
     if (auto* v = state.getRawParameterValue ("filterReso"))   resoValue = v->load();
     if (auto* v = state.getRawParameterValue ("filterMode"))   modeValue = v->load();
 }
 
-FilterResponseGraph::~FilterResponseGraph()
-{
-    state.removeParameterListener ("filterCutoff", this);
-    state.removeParameterListener ("filterReso", this);
-    state.removeParameterListener ("filterMode", this);
-}
+FilterResponseGraph::~FilterResponseGraph() { stopTimer(); }
 
-void FilterResponseGraph::parameterChanged (const juce::String& id, float newValue)
+void FilterResponseGraph::timerCallback()
 {
-    if (id == "filterCutoff")     cutoffValue = newValue;
-    else if (id == "filterReso")  resoValue = newValue;
-    else if (id == "filterMode")  modeValue = newValue;
-
-    repaint();
+    const float cutoff = state.getRawParameterValue ("filterCutoff")->load();
+    const float reso = state.getRawParameterValue ("filterReso")->load();
+    const float mode = state.getRawParameterValue ("filterMode")->load();
+    const bool changed = cutoff != cutoffValue || reso != resoValue || mode != modeValue;
+    cutoffValue = cutoff; resoValue = reso; modeValue = mode;
+    if (changed) repaint();
 }
 
 void FilterResponseGraph::paint (juce::Graphics& g)

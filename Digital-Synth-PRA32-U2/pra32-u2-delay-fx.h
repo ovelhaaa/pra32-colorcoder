@@ -45,6 +45,14 @@ public:
     m_delay_time_effective = m_delay_time;
   }
 
+  // Bounded, allocation-free panic reset; retain effect settings/smoothing.
+  INLINE void silence() {
+    for (auto& channel : m_delay_buff)
+      for (auto& sample : channel) sample = 0;
+    m_prev_sample_to_push_0 = 0;
+    m_prev_sample_to_push_1 = 0;
+  }
+
   INLINE void set_delay_level(uint8_t controller_value) {
     m_delay_level = ((controller_value + 1) >> 1) << 2;
   }

@@ -33,3 +33,6 @@ DigitalSynthVRA8U/build/*
 node_modules/
 
 juce_plugin/build/
+
+# Local Emscripten SDK (CI installs its own SDK).
+/emsdk/
