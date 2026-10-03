@@ -914,7 +914,7 @@ void testKeyboardReprepare()
         p.keyboardState.noteOff (1, 61, 0);
     }
     p.prepareToPlay (96000, 64);
-    CHECK (signalRms (renderBlock (p, 4096)) == 0);
+    // Queue before the first block so a surviving overflow flag would discard it.
     p.keyboardState.noteOn (1, 62, 1.0f);
     CHECK (signalRms (renderBlock (p, 8192)) > .01);
     p.keyboardState.noteOff (1, 62, 0);
