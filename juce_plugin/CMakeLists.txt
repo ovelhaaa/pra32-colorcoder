@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(PRA32ColorcoderPlugin VERSION 1.0.0)
+project(PRA32ColorcoderPlugin VERSION 0.9.0)
 
 # Fetch JUCE if not present locally
 include(FetchContent)
@@ -13,6 +13,7 @@ FetchContent_MakeAvailable(juce)
 # Create a JUCE plugin target
 juce_add_plugin(PRA32ColorcoderPlugin
     COMPANY_NAME "Tonecoder"
+    # Historical stable IDs: preserve compatibility with saved host sessions.
     PLUGIN_MANUFACTURER_CODE "PR32"
     PLUGIN_CODE "Colr"
     FORMATS VST3 Standalone

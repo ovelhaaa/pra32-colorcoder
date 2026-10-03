@@ -879,6 +879,18 @@ public:
     after_touch_channel(0);
   }
 
+  // Distinct from All Notes Off: terminate voices and effect history without
+  // changing the patch. No allocations, locks, EEPROM access or program reload.
+  void all_sound_off() {
+    all_notes_off();
+    for (auto& envelope : m_eg) envelope.silence();
+    for (auto& amp : m_amp) amp.process_at_low_rate(0);
+    if constexpr (NO_FX == false) {
+      m_chorus_fx.silence();
+      m_delay_fx.silence();
+    }
+  }
+
   /* INLINE */ void __not_in_flash_func(control_change)(uint8_t control_number, uint8_t controller_value) {
     m_current_controller_value_table[control_number] = controller_value;
 
@@ -1160,11 +1172,11 @@ if constexpr (NO_FX == false) {
     case OMNI_MODE_ON   :
     case MONO_MODE_ON   :
     case POLY_MODE_ON   :
-      all_notes_off();  // Strictly speaking, this is a violation of MIDI 1.0 Specification...
+      all_notes_off();
       break;
 
     case ALL_SOUND_OFF  :
-      all_notes_off();
+      all_sound_off();
       break;
 
     case RESET_ALL_CTRLS:

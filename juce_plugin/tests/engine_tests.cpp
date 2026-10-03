@@ -129,6 +129,32 @@ void testPolyphony()
     std::printf ("  single=%.1f  four=%.1f  ratio=%.2f\n", e1, e4, e4 / e1);
     CHECK (e4 > e1 * 1.5);   // genuinely multiple voices, not one
 
+    // Each fundamental must be present: energy alone could pass with only
+    // two or three voices. Compare against that note rendered in isolation.
+    auto fundamental = [] (const std::vector<int16_t>& x, double hz)
+    {
+        double real = 0, imag = 0;
+        for (size_t i = 0; i < x.size(); ++i)
+        {
+            const double phase = 6.283185307179586 * hz * i / 48000.0;
+            real += x[i] * std::cos (phase); imag += x[i] * std::sin (phase);
+        }
+        return std::hypot (real, imag) / x.size();
+    };
+    const auto chord = renderLeft (*poly, 24000);
+    for (int note : { 60, 64, 67, 71 })
+    {
+        auto isolated = makeSynth(); setFlatPatch (*isolated);
+        isolated->note_on ((uint8_t) note, 100); renderLeft (*isolated, 6000);
+        const auto solo = renderLeft (*isolated, 24000);
+        const double hz = 440.0 * std::pow (2.0, (note - 69) / 12.0);
+        const double amplitude = fundamental (chord, hz);
+        const double soloAmplitude = fundamental (solo, hz);
+        std::printf ("  voice note %d fundamental=%.1f solo=%.1f\n", note, amplitude, soloAmplitude);
+        CHECK (soloAmplitude > 100.0);
+        CHECK (amplitude > soloAmplitude * 0.25);
+    }
+
     // Voice stealing: a fifth note must not silence the instrument.
     poly->note_on (72, 100);
     const double e5 = rms (renderLeft (*poly, 6000));

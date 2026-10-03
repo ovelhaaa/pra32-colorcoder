@@ -87,6 +87,7 @@ void PRA32ColorcoderAudioProcessor::setUiProperty (const juce::Identifier& key,
 
 void PRA32ColorcoderAudioProcessor::capturePatchBaseline()
 {
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     patchBaseline.clear();
 
     for (const auto& p : SynthParameters::getParameters())
@@ -96,6 +97,7 @@ void PRA32ColorcoderAudioProcessor::capturePatchBaseline()
 
 bool PRA32ColorcoderAudioProcessor::isCurrentPatchEdited() const
 {
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     const auto& params = SynthParameters::getParameters();
 
     if (patchBaseline.size() != params.size())
@@ -148,12 +150,14 @@ PRA32ColorcoderAudioProcessor::PRA32ColorcoderAudioProcessor()
         apvts.addParameterListener (p.id, this);
 
     // Drains audio-thread MIDI requests into the APVTS on the message thread.
+    keyboardState.addListener (this);
     startTimer (15);
 }
 
 PRA32ColorcoderAudioProcessor::~PRA32ColorcoderAudioProcessor()
 {
     stopTimer();
+    keyboardState.removeListener (this);
 
     for (const auto& p : SynthParameters::getParameters())
         apvts.removeParameterListener (p.id, this);
@@ -290,7 +294,7 @@ int PRA32ColorcoderAudioProcessor::getNumPrograms()
 
 int PRA32ColorcoderAudioProcessor::getCurrentProgram()
 {
-    return juce::jmax (0, juce::jmin (PRA32MidiState::kFactoryProgramCount - 1, currentFactoryPreset));
+    return juce::jmax (0, juce::jmin (PRA32MidiState::kFactoryProgramCount - 1, currentFactoryPreset.load()));
 }
 
 void PRA32ColorcoderAudioProcessor::setCurrentProgram (int index)
@@ -311,6 +315,7 @@ void PRA32ColorcoderAudioProcessor::changeProgramName (int index, const juce::St
 
 void PRA32ColorcoderAudioProcessor::loadPreset(int index)
 {
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     if (! PRA32MidiState::isValidFactoryProgram (index))
         return;
 
@@ -338,6 +343,7 @@ void PRA32ColorcoderAudioProcessor::writeProgramValuesToAPVTS (int program)
 
 void PRA32ColorcoderAudioProcessor::captureBaselineFromProgram (int program)
 {
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     patchBaseline.clear();
 
     if (! PRA32MidiState::isValidFactoryProgram (program))
@@ -353,16 +359,18 @@ void PRA32ColorcoderAudioProcessor::captureBaselineFromProgram (int program)
 
 void PRA32ColorcoderAudioProcessor::finishProgramBookkeeping (int program)
 {
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     // The baseline is the pure factory column, so any host/GUI value that won
     // after the program change is correctly reported as an edit.
     captureBaselineFromProgram (program);
     currentFactoryPreset = program;
-    setUiProperty ("uiPreset", currentFactoryPreset);
+    setUiProperty ("uiPreset", currentFactoryPreset.load());
     sendChangeMessage();
 }
 
 void PRA32ColorcoderAudioProcessor::mirrorProgramToAPVTSAndUI (int program)
 {
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     if (! PRA32MidiState::isValidFactoryProgram (program))
         return;
 
@@ -423,53 +431,67 @@ void PRA32ColorcoderAudioProcessor::applyParameterValue (int index, int value)
 
 void PRA32ColorcoderAudioProcessor::loadPresetFromJson(const juce::String& jsonString)
 {
-    discardPendingParameterUpdates();
-    clearPendingProgram();
+    juce::var root;
+    if (juce::JSON::parse (jsonString, root).failed() || ! root.isObject())
+        return;
 
-    juce::var parsedJson = juce::JSON::parse(jsonString);
-    if (!parsedJson.isObject()) return;
-    
-    auto* obj = parsedJson.getDynamicObject();
+    auto* obj = root.getDynamicObject();
+    if (obj == nullptr) return; // JUCE arrays also report isObject().
+    const bool versioned = obj->hasProperty ("schemaVersion");
+    if (versioned)
+    {
+        const auto version = obj->getProperty ("schemaVersion");
+        if (! version.isInt() || (int) version != 1)
+            return;
+        obj = obj->getProperty ("parameters").getDynamicObject();
+        if (obj == nullptr)
+            return;
+    }
 
-    const DeferredWriteScope scope (applyDeferredInProgress);
-
+    // Validate the entire document before committing. Full patch: absent
+    // parameters use INITIALIZATION defaults, independent of the previous patch.
+    std::vector<int> values;
     for (const auto& p : SynthParameters::getParameters())
     {
-        juce::String presetKey = p.presetKey;
-        
-        juce::var paramVar;
+        juce::var value;
         bool found = false;
-        for (auto& prop : obj->getProperties()) {
-            if (prop.name.toString().trim() == presetKey) {
-                paramVar = prop.value;
+        for (const auto& prop : obj->getProperties())
+            if (prop.name.toString().trim() == p.presetKey)
+            {
+                value = prop.value;
                 found = true;
                 break;
             }
-        }
-        
-        if (found) {
-            int newValue = p.def;
-            if (paramVar.isArray()) {
-                auto* arr = paramVar.getArray();
-                if (arr->size() > 0) {
-                    if (arr->getReference(0).isArray()) {
-                        auto* currentArr = arr->getReference(0).getArray();
-                        if (currentArr->size() > 0) {
-                            newValue = currentArr->getReference(0);
-                        }
-                    } else {
-                        newValue = arr->getReference(0);
-                    }
-                }
-            } else {
-                newValue = (int)paramVar;
+
+        // Legacy patches also accept [value] and [[value]] containers.
+        if (! versioned)
+            for (int depth = 0; depth < 2 && value.isArray(); ++depth)
+            {
+                const auto* array = value.getArray();
+                if (array->isEmpty()) return;
+                const auto first = array->getReference (0);
+                value = first;
             }
-            
-            if (auto* param = apvts.getParameter(p.id)) {
-                param->setValueNotifyingHost(param->convertTo0to1((float)newValue));
-            }
+
+        int next = p.def;
+        if (found)
+        {
+            if (! (value.isInt() || value.isInt64() || value.isDouble())) return;
+            const double number = (double) value;
+            if (! std::isfinite (number)) return;
+            next = (int) std::lround (juce::jlimit ((double) p.min, (double) p.max, number));
         }
+        values.push_back (next);
     }
+
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
+    discardPendingParameterUpdates();
+    clearPendingProgram();
+    const DeferredWriteScope scope (applyDeferredInProgress);
+    const auto& params = SynthParameters::getParameters();
+    for (size_t i = 0; i < params.size(); ++i)
+        if (auto* param = apvts.getParameter (params[i].id))
+            param->setValueNotifyingHost (param->convertTo0to1 ((float) values[i]));
 
     capturePatchBaseline();
     currentFactoryPreset = -1;
@@ -479,16 +501,14 @@ void PRA32ColorcoderAudioProcessor::loadPresetFromJson(const juce::String& jsonS
 
 juce::String PRA32ColorcoderAudioProcessor::savePresetToJson()
 {
-    juce::DynamicObject::Ptr obj = new juce::DynamicObject();
-    
+    juce::DynamicObject::Ptr parameters = new juce::DynamicObject();
     for (const auto& p : SynthParameters::getParameters())
-    {
-        juce::String presetKey = p.presetKey;
-        float currentVal = *apvts.getRawParameterValue(p.id);
-        obj->setProperty(presetKey, (int)currentVal);
-    }
-    
-    return juce::JSON::toString(juce::var(obj.get()));
+        parameters->setProperty (p.presetKey,
+            (int) std::lround (apvts.getRawParameterValue (p.id)->load()));
+    juce::DynamicObject::Ptr root = new juce::DynamicObject();
+    root->setProperty ("schemaVersion", 1);
+    root->setProperty ("parameters", juce::var (parameters.get()));
+    return juce::JSON::toString (juce::var (root.get()));
 }
 
 //==============================================================================
@@ -499,6 +519,27 @@ void PRA32ColorcoderAudioProcessor::prepareToPlay (double sampleRate, int sample
     // The PRA32 engine operates at a fixed 48 kHz. The resampler adapts its
     // output to the host rate and is a bit-transparent passthrough at 48 kHz.
     // All filter/history memory is reserved here (never on the audio thread).
+    // Hosts call prepare with rendering stopped. Recreate the engine here to
+    // reset held notes, envelopes and FX histories, while preserving the APVTS patch.
+    {
+        // Rendering is stopped here. Exclude the UI producer while resetting
+        // the FIFO storage; the audio consumer never takes this lock.
+        const juce::ScopedLock producerLock (keyboardProducerLock);
+        keyboardFifo.reset();
+        keyboardEvents.fill ({});
+        keyboardOverflow.store (false);
+        for (auto& note : hostKeyboardNotes) note.store (0);
+    }
+    synthWrapper = std::make_unique<PRA32Wrapper>();
+    synthWrapper->synth.initialize();
+    for (auto& binding : paramBindings)
+    {
+        binding.lastValue = -1.0f;
+        binding.midiPending = false;
+    }
+    pcByCcValues.fill (0);
+    wasTransportPlaying = false;
+    updateEngineFromParameters();
     resampler.prepare (sampleRate);
 
     // The resampler is causal: it only ever requests engine samples at or before
@@ -511,6 +552,7 @@ void PRA32ColorcoderAudioProcessor::prepareToPlay (double sampleRate, int sample
 
 void PRA32ColorcoderAudioProcessor::releaseResources()
 {
+    synthWrapper->synth.all_notes_off();
     resampler.reset();
 }
 
@@ -542,12 +584,48 @@ void PRA32ColorcoderAudioProcessor::processBlock (juce::AudioBuffer<float>& buff
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, numSamples);
 
+    // Release held notes once on a host transport stop; stopped hosts may still
+    // play manual MIDI/keyboard notes. Preserve normal release/FX tails.
+    if (auto* playHead = getPlayHead())
+        if (const auto position = playHead->getPosition())
+        {
+            const bool playing = position->getIsPlaying();
+            if (wasTransportPlaying && ! playing)
+            {
+                synthWrapper->synth.all_notes_off();
+                for (auto& note : hostKeyboardNotes) note.store (-1);
+            }
+            wasTransportPlaying = playing;
+        }
+
     // 1. Apply block-boundary parameter changes (GUI, host automation, state
     //    recall, preset loads) to the engine.
     updateEngineFromParameters();
 
-    // 2. Inject the on-screen keyboard's events into the MIDI stream.
-    keyboardState.processNextMidiBuffer (midiMessages, 0, numSamples, true);
+    // 2. Drain bounded UI events at the start of the next nonempty block.
+    if (numSamples > 0)
+    {
+        const bool overflow = keyboardOverflow.exchange (false);
+        if (overflow)
+        {
+            synthWrapper->synth.all_sound_off();
+            for (auto& note : hostKeyboardNotes) note.store (-1);
+        }
+        int start1, size1, start2, size2;
+        keyboardFifo.prepareToRead (keyboardFifo.getNumReady(), start1, size1, start2, size2);
+        auto apply = [this] (int index)
+        {
+            const auto& event = keyboardEvents[(size_t) index];
+            if (event.on) synthWrapper->synth.note_on ((uint8_t) event.note, (uint8_t) event.velocity);
+            else synthWrapper->synth.note_off ((uint8_t) event.note);
+        };
+        if (! overflow)
+        {
+            for (int i = 0; i < size1; ++i) apply (start1 + i);
+            for (int i = 0; i < size2; ++i) apply (start2 + i);
+        }
+        keyboardFifo.finishedRead (size1 + size2);
+    }
 
     // 3. Render sample-accurately: audio up to each event, apply the event,
     //    then continue. The resampler keeps its phase/state across segments.
@@ -589,6 +667,16 @@ void PRA32ColorcoderAudioProcessor::renderAudioRange (juce::AudioBuffer<float>& 
 
 void PRA32ColorcoderAudioProcessor::updateEngineFromParameters()
 {
+    const auto generation = parameterResetGeneration.load (std::memory_order_acquire);
+    if (generation != audioParameterResetGeneration)
+    {
+        for (auto& binding : paramBindings)
+        {
+            binding.midiPending = false;
+            binding.lastValue = -1.0f;
+        }
+        audioParameterResetGeneration = generation;
+    }
     const int count = juce::jmin ((int) paramBindings.size(), (int) ccToParamIndex.size());
 
     for (int i = 0; i < count; ++i)
@@ -641,15 +729,19 @@ void PRA32ColorcoderAudioProcessor::handleMidiMessage (const juce::MidiMessage& 
     if (msg.isNoteOn())
     {
         synthWrapper->synth.note_on (msg.getNoteNumber(), msg.getVelocity());
+        hostKeyboardNotes[(size_t) msg.getNoteNumber()].store (1);
     }
     else if (msg.isNoteOff())
     {
         synthWrapper->synth.note_off (msg.getNoteNumber());
+        hostKeyboardNotes[(size_t) msg.getNoteNumber()].store (-1);
     }
     else if (msg.isController())
     {
         const int controller = msg.getControllerNumber();
         const int value = msg.getControllerValue();
+        if (controller == 120 || controller == 123)
+            for (auto& note : hostKeyboardNotes) note.store (-1);
 
         // --- Program Change by CC (CC112..CC119) -----------------------------
         // The engine's internal program_change() ROM is not the plugin's preset
@@ -672,6 +764,11 @@ void PRA32ColorcoderAudioProcessor::handleMidiMessage (const juce::MidiMessage& 
 
             return;
         }
+
+        // Embedded EEPROM/program-writing commands have no meaning in a
+        // desktop factory/JSON patch workflow. Never execute them in rendering.
+        if (controller == PROG_N_TO_W_TO || controller == WRITE_P_TO_PROG)
+            return;
 
         // Always forward to the engine immediately so performance controllers
         // (sustain, expression, breath, modulation) stay sample-accurate.
@@ -739,10 +836,14 @@ void PRA32ColorcoderAudioProcessor::handleMidiMessage (const juce::MidiMessage& 
 void PRA32ColorcoderAudioProcessor::discardPendingParameterUpdates() noexcept
 {
     parameterMailbox.clearAll();
+    // Cancel audio-owned CC overrides at its next block, without racing the
+    // ParamBinding fields from the state/preset-loading thread.
+    parameterResetGeneration.fetch_add (1, std::memory_order_release);
 }
 
 void PRA32ColorcoderAudioProcessor::flushDeferredUpdates()
 {
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     // Unified deferred timeline: a Program Change is a global event, a MIDI CC
     // is a per-parameter event and a GUI/host edit is a per-parameter event.
     // They all carry a sequence from the same generator, so for each parameter
@@ -816,9 +917,41 @@ void PRA32ColorcoderAudioProcessor::flushDeferredUpdates()
         finishProgramBookkeeping (program.program);
 }
 
+void PRA32ColorcoderAudioProcessor::queueKeyboardEvent (int note, int velocity, bool on)
+{
+    const juce::ScopedLock producerLock (keyboardProducerLock);
+    if (mirroringKeyboard) return;
+    int start1, size1, start2, size2;
+    keyboardFifo.prepareToWrite (1, start1, size1, start2, size2);
+    if (size1 + size2 == 0) { keyboardOverflow.store (true); return; }
+    keyboardEvents[(size_t) (size1 > 0 ? start1 : start2)] = { note, velocity, on };
+    keyboardFifo.finishedWrite (1);
+}
+
+void PRA32ColorcoderAudioProcessor::handleNoteOn (juce::MidiKeyboardState*, int, int note, float velocity)
+{
+    queueKeyboardEvent (note, juce::jlimit (1, 127, juce::roundToInt (velocity * 127.0f)), true);
+}
+
+void PRA32ColorcoderAudioProcessor::handleNoteOff (juce::MidiKeyboardState*, int, int note, float)
+{
+    queueKeyboardEvent (note, 0, false);
+}
+
 void PRA32ColorcoderAudioProcessor::timerCallback()
 {
     flushDeferredUpdates();
+    // JUCE's keyboard lock, listeners and indirect-event cleanup stay on the UI thread.
+    mirroringKeyboard = true;
+    for (int note = 0; note < 128; ++note)
+    {
+        const int change = hostKeyboardNotes[(size_t) note].exchange (0);
+        if (change > 0) keyboardState.noteOn (1, note, 1.0f);
+        if (change < 0) keyboardState.noteOff (1, note, 0.0f);
+    }
+    juce::MidiBuffer unused;
+    keyboardState.processNextMidiBuffer (unused, 0, 0, false);
+    mirroringKeyboard = false;
 }
 
 #include "PluginEditor.h"
@@ -837,13 +970,21 @@ juce::AudioProcessorEditor* PRA32ColorcoderAudioProcessor::createEditor()
 //==============================================================================
 void PRA32ColorcoderAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
+    // Save the committed APVTS patch. Pending MIDI remains deferred until the
+    // message-thread timer runs; saving must not notify the host or mutate UI.
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     auto state = apvts.copyState();
+    state.setProperty ("uiPreset", currentFactoryPreset.load(), nullptr);
+    juce::Array<juce::var> baseline;
+    for (int value : patchBaseline) baseline.add (value);
+    state.setProperty ("patchBaseline", juce::JSON::toString (juce::var (baseline), true), nullptr);
     std::unique_ptr<juce::XmlElement> xml (state.createXml());
     copyXmlToBinary (*xml, destData);
 }
 
 void PRA32ColorcoderAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
+    const juce::ScopedLock snapshotLock (stateSnapshotLock);
     std::unique_ptr<juce::XmlElement> xmlState (getXmlFromBinary (data, sizeInBytes));
 
     if (xmlState != nullptr)
@@ -853,15 +994,61 @@ void PRA32ColorcoderAudioProcessor::setStateInformation (const void* data, int s
             discardPendingParameterUpdates();
             clearPendingProgram();
 
+            auto restored = juce::ValueTree::fromXml (*xmlState);
+            // XML attributes arrive as strings. Parse strictly, including range
+            // and integrality, before using an untrusted program index.
+            const auto presetText = restored.getProperty ("uiPreset").toString();
+            int program = -1;
+            for (int i = 0; i < getNumPrograms(); ++i)
+                if (presetText == juce::String (i)) program = i;
+            restored.setProperty ("uiPreset", program, nullptr);
+
+            for (const auto& pd : SynthParameters::getParameters())
+            {
+                auto child = restored.getChildWithProperty ("id", pd.id);
+                if (! child.isValid())
+                {
+                    child = juce::ValueTree ("PARAM");
+                    child.setProperty ("id", pd.id, nullptr);
+                    restored.addChild (child, -1, nullptr);
+                    child.setProperty ("value", pd.def, nullptr);
+                }
+                const auto raw = child.getProperty ("value");
+                const double number = (double) raw;
+                child.setProperty ("value", std::isfinite (number)
+                    ? juce::jlimit ((double) pd.min, (double) pd.max, number)
+                    : (double) pd.def, nullptr);
+            }
             {
                 const DeferredWriteScope scope (applyDeferredInProgress);
-                apvts.replaceState (juce::ValueTree::fromXml (*xmlState));
+                apvts.replaceState (restored);
             }
 
-            capturePatchBaseline();
-
-            const auto presetVar = getUiProperty ("uiPreset");
-            currentFactoryPreset = presetVar.isVoid() ? -1 : (int) presetVar;
+            currentFactoryPreset = program;
+            if (program >= 0)
+                captureBaselineFromProgram (program);
+            else
+            {
+                // USER baseline survives session recall; legacy sessions without
+                // baseline metadata adopt the restored patch as their baseline.
+                capturePatchBaseline();
+                const auto saved = juce::JSON::parse (restored.getProperty ("patchBaseline").toString());
+                if (const auto* array = saved.getArray())
+                    if (array->size() == (int) patchBaseline.size())
+                    {
+                        bool valid = true;
+                        const auto& ps = SynthParameters::getParameters();
+                        for (int i = 0; i < array->size(); ++i)
+                        {
+                            const auto& v = array->getReference (i);
+                            valid = valid && v.isInt() && (int) v >= ps[(size_t) i].min
+                                                       && (int) v <= ps[(size_t) i].max;
+                        }
+                        if (valid)
+                            for (int i = 0; i < array->size(); ++i)
+                                patchBaseline[(size_t) i] = (int) array->getReference (i);
+                    }
+            }
             sendChangeMessage();
         }
     }

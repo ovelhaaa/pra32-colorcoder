@@ -149,8 +149,7 @@ void PRA32ParameterPage::buildFilter()
 {
     auto& filter = *addModule ("FILTER NETWORK");
     filter.setAutoLayout (false);
-    addParam ("filterCutoff");
-    addParam ("filterReso");
+    addToPanel (filter, { "filterCutoff", "filterReso" });
 
     auto* graph = graphs.add (new FilterResponseGraph (processor.getAPVTS(),
                                                        sectionAccent (section)));
@@ -590,11 +589,12 @@ PRA32ColorcoderAudioProcessorEditor::PRA32ColorcoderAudioProcessorEditor (
                 "Load Preset", juce::File::getSpecialLocation (juce::File::userDocumentsDirectory), "*.json");
             const auto flags = juce::FileBrowserComponent::openMode
                              | juce::FileBrowserComponent::canSelectFiles;
-            fileChooser->launchAsync (flags, [this] (const juce::FileChooser& fc)
+            fileChooser->launchAsync (flags, [safe = juce::Component::SafePointer<PRA32ColorcoderAudioProcessorEditor> (this)] (const juce::FileChooser& fc)
             {
+                if (safe == nullptr) return;
                 auto file = fc.getResult();
                 if (file.existsAsFile())
-                    audioProcessor.loadPresetFromJson (file.loadFileAsString());
+                    safe->audioProcessor.loadPresetFromJson (file.loadFileAsString());
             });
         });
     };
@@ -613,11 +613,12 @@ PRA32ColorcoderAudioProcessorEditor::PRA32ColorcoderAudioProcessorEditor (
             "Save Preset", juce::File::getSpecialLocation (juce::File::userDocumentsDirectory), "*.json");
         const auto flags = juce::FileBrowserComponent::saveMode
                          | juce::FileBrowserComponent::canSelectFiles;
-        fileChooser->launchAsync (flags, [this] (const juce::FileChooser& fc)
+        fileChooser->launchAsync (flags, [safe = juce::Component::SafePointer<PRA32ColorcoderAudioProcessorEditor> (this)] (const juce::FileChooser& fc)
         {
+            if (safe == nullptr) return;
             auto file = fc.getResult();
             if (file != juce::File{})
-                file.replaceWithText (audioProcessor.savePresetToJson());
+                file.replaceWithText (safe->audioProcessor.savePresetToJson());
         });
     };
 
@@ -778,10 +779,10 @@ void PRA32ColorcoderAudioProcessorEditor::showPresetMenu()
                       true, i == current);
 
     menu.showMenuAsync (juce::PopupMenu::Options().withTargetComponent (&presetDisplay),
-                        [this] (int result)
+                        [safe = juce::Component::SafePointer<PRA32ColorcoderAudioProcessorEditor> (this)] (int result)
                         {
-                            if (result > 0)
-                                loadPreset (result - 1);
+                            if (safe != nullptr && result > 0)
+                                safe->loadPreset (result - 1);
                         });
 }
 

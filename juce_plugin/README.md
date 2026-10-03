@@ -38,7 +38,7 @@ The TC-32 sound engine is based on the 4-voice polyphonic PRA32-U2 engine:
 
 ## Technical Credits & License
 
-* **Synthesis Engine**: Based on [Digital Synth PRA32-U2](https://github.com/risgk/digital-synth-pra32-u2) by ISGK Instruments (MIT License).
+* **Synthesis Engine**: Based on [Digital Synth PRA32-U2](https://github.com/risgk/digital-synth-pra32-u2) by ISGK Instruments (CC0 1.0 Universal; see the repository LICENSE and [upstream license](https://github.com/risgk/digital-synth-pra32-u2/blob/main/LICENSE)).
 * **Tonecoder TC-32 UI & Plug-in Implementation**: Built with JUCE 8.
 
 ---
@@ -59,3 +59,39 @@ cmake --build build --config Release
 Build targets:
 - `Tonecoder TC-32_VST3`
 - `Tonecoder TC-32_Standalone`
+
+
+## RC0 / beta hardening
+
+Product version: 0.9.0; candidate package label: 0.9.0-beta.1.
+Stable historical identity: COMPANY_NAME `Tonecoder`, PRODUCT_NAME `Tonecoder TC-32`,
+manufacturer `PR32`, plugin `Colr`, bundle `com.Tonecoder.PRA32ColorcoderPlugin`. Existing APVTS IDs and their version hints are
+unchanged. The CMake target name is intentionally retained. JUCE remains pinned
+to 8.0.0; Windows CI uses Windows 2022, VS2022, x64, Release.
+
+Patch JSON schema 1 is `{ "schemaVersion": 1, "parameters": { "FILTER_CUTOFF": 112, ... } }`.
+The legacy flat object (including `[value]` / `[[value]]` containers) remains readable.
+Both formats are **full patches**: missing parameters use `SynthParameters` defaults
+(INITIALIZATION), unknown fields are ignored, numeric values are rounded and clamped
+to each parameter's real range. Invalid root/schema/known parameter types or nonfinite
+values reject the entire document without changing the current patch.
+
+A factory session always compares against its pure factory column; edits remain
+modified on recall. A loaded JSON patch starts a USER baseline. That baseline is
+saved in session XML and restored, including subsequent edits. Legacy USER sessions
+without baseline metadata adopt their restored values as baseline. Invalid `uiPreset`
+metadata is normalized to -1 (USER/SESSION).
+
+Windows CI runs CTest and pinned pluginval 1.0.4 at strictness 5, with GUI tests enabled,
+all six rates and nine block sizes. Strictness 5 is pluginval's documented minimum
+host compatibility level: https://github.com/Tracktion/pluginval . No validation step
+is optional; plugin archives are created/uploaded only after successful validation.
+Diagnostic logs may be uploaded on failure. Packages include BUILD.txt with commit SHA.
+See [TESTING.md](../TESTING.md) for tester instructions.
+
+PRA32-U2 / ISGK Instruments is credited under CC0 1.0 Universal. JUCE is separately
+licensed under its commercial terms or AGPLv3; the engine's CC0 license does not
+relicense JUCE. Distribution must follow the project's applicable JUCE license.
+
+The web workflow installs its own Emscripten SDK using setup-emsdk. The orphaned
+local emsdk gitlink is removed; local SDK folders are ignored and are not deleted.

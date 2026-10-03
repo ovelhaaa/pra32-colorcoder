@@ -82,6 +82,15 @@ public:
     m_note_on_velocity = 0;
   }
 
+  // MIDI All Sound Off is immediate, even when release=127 holds forever.
+  // Preserve all authored envelope coefficients and velocity sensitivity.
+  INLINE void silence() {
+    m_state = STATE_IDLE;
+    m_level = 0;
+    m_level_out = 0;
+    m_note_on_velocity = 0;
+  }
+
   INLINE int16_t get_output() {
     return m_level_out;
   }
