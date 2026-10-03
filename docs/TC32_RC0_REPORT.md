@@ -59,8 +59,9 @@ all parameter paths, MIDI performance, program timing, pressure/breath/velocity,
 mode changes with held notes, panic, repeated editor lifecycle and prepare/recall.
 
 Pluginval: pinned 1.0.4, strictness 5, GUI enabled, six rates and nine block sizes.
-A local run passed before the final panic/toggle fixes; final validation and remote
-CI must pass before this candidate is approved. CI pins Windows 2022 / VS2022 x64,
+Final local VST3 run: SUCCESS, exit code 0, after panic/toggle fixes.
+Remote CI evidence is attached to [PR #42](https://github.com/ovelhaaa/pra32-colorcoder/pull/42);
+its mandatory checks must be green for the current head before approval. CI pins Windows 2022 / VS2022 x64,
 checks download SHA256, waits for pluginval's actual process exit, and packages
 VST3/Standalone only after successful CTest/pluginval.
 

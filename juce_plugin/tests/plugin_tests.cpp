@@ -542,9 +542,9 @@ void testNoteOnTiming()
         for (int i = 0; i < eventSample; ++i) CHECK (out[(size_t) i] == 0.0f);
         const double compensated = (onset - p.getLatencySamples()) / fs;
         const double referenceTime = referenceOnset / 48000.0;
-        // Same six ENGINE samples as a temporal bound for threshold differences
-        // caused by FIR smoothing; latency itself is verified separately.
-        CHECK (std::abs (compensated - referenceTime) <= 6.0 / 48000.0);
+        // Compensated onset may differ by one engine tick plus one host tick
+        // (source/threshold quantisation and integer latency reporting).
+        CHECK (std::abs (compensated - referenceTime) <= 1.0 / 48000.0 + 1.0 / fs);
         std::printf ("  %.0f Hz event=%d onset=%d oracle=%d latency=%d compensated-error=%.3f us\n",
             fs, eventSample, onset, expectedOnset, p.getLatencySamples(), (compensated-referenceTime)*1.0e6);
     }
