@@ -101,6 +101,7 @@ if (TARGET juce::juce_audio_processors)
     )
 
     target_link_libraries(pra32_plugin_tests PRIVATE
+        TC32FontData
         juce::juce_audio_utils
         juce::juce_audio_processors
         juce::juce_gui_extra

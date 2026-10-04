@@ -20,96 +20,23 @@ inline juce::Point<float> polar (juce::Point<float> c, float r, float a)
     return { c.x + std::sin (a) * r, c.y - std::cos (a) * r };
 }
 
-// Fluted bakelite skirt + domed body + chrome step + ivory pointer + chrome cap.
-// Directly cued from the Apollo rack unit.
-void paintVintageKnob (juce::Graphics& g, juce::Point<float> centre, float radius,
-                       float angle, bool dimmed, bool active)
+// Precise instrument encoder: satin body, shallow edge and one signal pointer.
+void paintInstrumentKnob (juce::Graphics& g, juce::Point<float> centre, float radius,
+                          float angle, bool dimmed, bool active, juce::Colour accent)
 {
-    const float twoPi = juce::MathConstants<float>::twoPi;
-    auto at = [centre] (float r, float a) { return polar (centre, r, a); };
-
-    // Drop shadow on the panel.
-    g.setColour (juce::Colours::black.withAlpha (dimmed ? 0.25f : 0.42f));
-    g.fillEllipse (centre.x - radius, centre.y - radius + sc (2.5f), radius * 2.0f, radius * 2.0f);
-
-    // Fluted bakelite skirt.
-    {
-        juce::ColourGradient skirt (bakeliteLight, centre.x - radius, centre.y - radius,
-                                    bakeliteDark, centre.x + radius * 0.6f, centre.y + radius, false);
-        g.setGradientFill (skirt);
-        g.fillEllipse (centre.x - radius, centre.y - radius, radius * 2.0f, radius * 2.0f);
-
-        constexpr int flutes = 22;
-        const float grooveInner = radius - juce::jmax (sc (4.5f), radius * 0.20f);
-        const float grooveOuter = radius - sc (0.6f);
-
-        for (int i = 0; i < flutes; ++i)
-        {
-            const float a = (float) i / (float) flutes * twoPi;
-            g.setColour (juce::Colours::black.withAlpha (dimmed ? 0.16f : 0.34f));
-            g.drawLine (juce::Line<float> (at (grooveInner, a), at (grooveOuter, a)), sc (1.9f));
-
-            const float aRidge = a + 0.5f / (float) flutes * twoPi;
-            g.setColour (juce::Colours::white.withAlpha (dimmed ? 0.03f : 0.08f));
-            g.drawLine (juce::Line<float> (at (grooveInner + sc (0.5f), aRidge), at (grooveOuter, aRidge)),
-                        sc (1.0f));
-        }
-
-        g.setColour (juce::Colours::black.withAlpha (0.45f));
-        g.drawEllipse (centre.x - radius, centre.y - radius, radius * 2.0f, radius * 2.0f, sc (1.0f));
-    }
-
-    // Domed body.
-    const float bodyR = radius * 0.74f;
-    {
-        juce::ColourGradient body (bakeliteLight.brighter (0.10f),
-                                   centre.x - bodyR * 0.42f, centre.y - bodyR * 0.52f,
-                                   bakeliteDark,
-                                   centre.x + bodyR * 0.55f, centre.y + bodyR * 0.65f, false);
-        g.setGradientFill (body);
-        g.fillEllipse (centre.x - bodyR, centre.y - bodyR, bodyR * 2.0f, bodyR * 2.0f);
-
-        g.setColour (juce::Colours::white.withAlpha (dimmed ? 0.03f : 0.11f));
-        g.fillEllipse (centre.x - bodyR * 0.60f, centre.y - bodyR * 0.82f,
-                       bodyR * 1.05f, bodyR * 0.66f);
-
-        g.setColour (chromeDark.withAlpha (dimmed ? 0.35f : 0.85f));
-        g.drawEllipse (centre.x - bodyR, centre.y - bodyR, bodyR * 2.0f, bodyR * 2.0f, sc (1.3f));
-        g.setColour (chromeLight.withAlpha (dimmed ? 0.10f : 0.30f));
-        g.drawEllipse (centre.x - bodyR - sc (0.8f), centre.y - bodyR - sc (0.8f),
-                       (bodyR + sc (0.8f)) * 2.0f, (bodyR + sc (0.8f)) * 2.0f, sc (0.8f));
-    }
-
-    // Ivory pointer running across the dome onto the skirt.
-    {
-        const auto p1 = at (radius * 0.20f, angle);
-        const auto p2 = at (radius * 0.90f, angle);
-
-        g.setColour (juce::Colours::black.withAlpha (0.45f));
-        g.drawLine (juce::Line<float> (p1.translated (0.0f, sc (1.0f)), p2.translated (0.0f, sc (1.0f))),
-                    sc (2.6f));
-
-        g.setColour (dimmed ? textSecondary.withAlpha (0.45f)
-                            : (active ? juce::Colours::white : knobPointer));
-        g.drawLine (juce::Line<float> (p1, p2), sc (2.3f));
-
-        g.setColour (dimmed ? textSecondary.withAlpha (0.4f) : knobPointer);
-        g.fillEllipse (p2.x - sc (1.6f), p2.y - sc (1.6f), sc (3.2f), sc (3.2f));
-    }
-
-    // Chrome centre cap.
-    {
-        const float capR = bodyR * 0.30f;
-        juce::ColourGradient cap (chromeLight, centre.x - capR * 0.45f, centre.y - capR * 0.55f,
-                                  chromeDark, centre.x + capR * 0.55f, centre.y + capR * 0.60f, true);
-        g.setGradientFill (cap);
-        g.fillEllipse (centre.x - capR, centre.y - capR, capR * 2.0f, capR * 2.0f);
-
-        g.setColour (chromeDark.withAlpha (0.7f));
-        g.drawEllipse (centre.x - capR, centre.y - capR, capR * 2.0f, capR * 2.0f, sc (0.8f));
-        g.setColour (juce::Colours::white.withAlpha (0.35f));
-        g.fillEllipse (centre.x - capR * 0.45f, centre.y - capR * 0.55f, capR * 0.6f, capR * 0.4f);
-    }
+    auto body = juce::Rectangle<float> (radius * 2.0f, radius * 2.0f).withCentre (centre);
+    g.setColour (juce::Colours::black.withAlpha (0.22f));
+    g.fillEllipse (body.translated (0.0f, 1.5f));
+    g.setGradientFill (juce::ColourGradient (knobBodyTop, body.getX(), body.getY(),
+                                            knobBody, body.getRight(), body.getBottom(), false));
+    g.fillEllipse (body);
+    g.setColour (active ? tickStrong : separator);
+    g.drawEllipse (body, 1.0f);
+    g.setColour (bevelLight);
+    g.drawEllipse (body.reduced (2.0f), 0.8f);
+    g.setColour (dimmed ? textDim : accent);
+    g.drawLine (juce::Line<float> (polar (centre, radius * 0.30f, angle),
+                                   polar (centre, radius * 0.86f, angle)), 2.2f);
 }
 
 void paintKnobBody (juce::Graphics& g, juce::Rectangle<float> area, float angle,
@@ -117,7 +44,7 @@ void paintKnobBody (juce::Graphics& g, juce::Rectangle<float> area, float angle,
                     bool enabled, bool active, int activeLedSegments, int totalLedSegments)
 {
     auto centre = area.getCentre();
-    const float outerR = juce::jmin (area.getWidth(), area.getHeight()) * 0.5f - sc (1.0f);
+    const float outerR = juce::jmin (64.0f, juce::jmin (area.getWidth(), area.getHeight())) * 0.5f - 1.0f;
     const float knobR  = outerR * 0.70f;
     const float endAngle = 2.0f * centreAngle - startAngle;
 
@@ -134,7 +61,7 @@ void paintKnobBody (juce::Graphics& g, juce::Rectangle<float> area, float angle,
         float outer = outerR;
         float thick = major ? sc (1.7f) : sc (1.0f);
 
-        if (major)              inner -= sc (4.5f);
+        if (major)              inner -= 1.5f;
         if (centreTick)       { inner = knobR - sc (1.0f); outer = outerR + sc (1.0f); thick = sc (1.8f); }
 
         juce::Colour col = centreTick ? accent.withAlpha (0.85f)
@@ -145,7 +72,7 @@ void paintKnobBody (juce::Graphics& g, juce::Rectangle<float> area, float angle,
         g.drawLine (juce::Line<float> (polar (centre, inner, a), polar (centre, outer, a)), thick);
     }
 
-    paintVintageKnob (g, centre, knobR, angle, ! enabled, active);
+    paintInstrumentKnob (g, centre, knobR, angle, ! enabled, active, accent);
 
     // Optional annunciator row for stepped selectors.
     if (totalLedSegments > 1)
@@ -219,8 +146,11 @@ juce::String ParameterKnob::getTooltip()
 void ParameterKnob::paint (juce::Graphics& g)
 {
     auto r = getLocalBounds().toFloat();
-    auto nameArea = r.removeFromTop (11.0f);
-    auto valueArea = r.removeFromBottom (13.0f);
+    const auto* editor = findParentComponentOfClass<juce::AudioProcessorEditor>();
+    const bool compact = editor != nullptr && editor->getHeight() <= 540;
+    r = r.withSizeKeepingCentre (r.getWidth(), juce::jmin (compact ? 72.0f : 96.0f, r.getHeight()));
+    auto nameArea = r.removeFromTop (15.0f);
+    auto valueArea = r.removeFromBottom (17.0f);
 
     const bool enabled = isEnabled();
     const auto accent = sectionAccent (param.section);
@@ -350,9 +280,9 @@ void SteppedSelector::paint (juce::Graphics& g)
 
         if (on)
         {
-            g.setColour (accent.withAlpha (isEnabled() ? 0.92f : 0.35f));
+            g.setColour (accent.withAlpha (isEnabled() ? 0.14f : 0.06f));
             g.fillRoundedRectangle (seg.reduced (sc (1.0f)), sc (3.0f));
-            g.setColour (juce::Colours::black.withAlpha (0.30f));
+            g.setColour (accent);
             g.drawLine (seg.getX() + sc (3.0f), seg.getY() + sc (1.0f),
                         seg.getRight() - sc (3.0f), seg.getY() + sc (1.0f), sc (1.4f));
         }
@@ -374,7 +304,7 @@ void SteppedSelector::paint (juce::Graphics& g)
                                : param.enumLabels[juce::jlimit (0, param.enumLabels.size() - 1, i)];
 
         g.setFont (valueFont());
-        g.setColour (on ? juce::Colours::black : (isEnabled() ? textPrimary : textDim));
+        g.setColour (on ? accent : (isEnabled() ? textSecondary : textDim));
         g.drawFittedText (label.toUpperCase(), seg.reduced (sc (2.0f)).toNearestInt(),
                           juce::Justification::centred, 1, 0.65f);
     }
@@ -440,9 +370,9 @@ void ToggleSwitch::paintButton (juce::Graphics& g, bool highlighted, bool down)
     if (down)
         paddle = paddle.translated (0.0f, sc (1.0f));
 
-    juce::ColourGradient grad (on ? accent : panelRaised.brighter (0.08f),
+    juce::ColourGradient grad (panelRaised.brighter (0.08f),
                                paddle.getX(), paddle.getY(),
-                               on ? accent.darker (0.35f) : panelSunken,
+                               panelSunken,
                                paddle.getX(), paddle.getBottom(), false);
     g.setGradientFill (grad);
     g.fillRoundedRectangle (paddle, sc (3.0f));
@@ -454,7 +384,7 @@ void ToggleSwitch::paintButton (juce::Graphics& g, bool highlighted, bool down)
     g.setColour (juce::Colours::black.withAlpha (0.55f));
     g.drawRoundedRectangle (paddle, sc (3.0f), sc (1.0f));
 
-    g.setColour (on ? juce::Colours::black : textSecondary);
+    g.setColour (on ? accent : textSecondary);
     g.setFont (valueFont());
     g.drawText (on ? "ON" : "OFF", paddle.toNearestInt(), juce::Justification::centred, false);
 
@@ -484,31 +414,18 @@ void ModulePanel::paint (juce::Graphics& g)
 
     drawRaisedPlate (g, b, radiusMedium);
 
-    const float screwR = juce::jlimit (sc (2.4f), sc (3.6f), b.getHeight() * 0.018f);
-    drawScrewsInCorners (g, b, sc (9.0f), screwR);
-
-    auto header = getLocalBounds().reduced (juce::roundToInt (sc (16.0f)), juce::roundToInt (sc (6.0f)))
-                      .removeFromTop (juce::jmax (14, juce::roundToInt (b.getHeight() * 0.12f)));
-
-    // Section pilot lamp.
-    const float lampSize = juce::jmin (sc (14.0f), (float) header.getHeight());
-    auto lampArea = header.removeFromRight ((int) lampSize);
-    lampArea = lampArea.withSizeKeepingCentre ((int) lampSize, (int) lampSize);
-    header.removeFromRight (juce::roundToInt (sc (8.0f)));
-    drawLamp (g, lampArea.toFloat(), accent, 0.75f, sc (2.5f));
-
-    drawEngravedText (g, uppercase (title), header.toFloat(), moduleFont(),
-                      juce::Justification::centredLeft, textPrimary,
-                      engraveShadow.withAlpha (0.7f));
-
+    auto header = getLocalBounds().reduced (12, 6).removeFromTop (16);
+    g.setColour (accent.withAlpha (0.7f));
+    g.fillRect (12.0f, 4.0f, 24.0f, 1.5f);
+    g.setFont (moduleFont());
+    g.setColour (textPrimary);
+    g.drawText (uppercase (title), header, juce::Justification::centredLeft, false);
     if (subsection.isNotEmpty())
-        drawEngravedText (g, uppercase (subsection), header.toFloat(), legendFont(),
-                          juce::Justification::centredRight, accent,
-                          engraveShadow.withAlpha (0.6f));
-
-    const float lineY = (float) header.getBottom() + sc (3.0f);
-    g.setColour (juce::Colours::black.withAlpha (0.45f));
-    g.drawLine (sc (10.0f), lineY, (float) getWidth() - sc (10.0f), lineY, 1.0f);
+    {
+        g.setFont (legendFont());
+        g.setColour (accent);
+        g.drawText (uppercase (subsection), header, juce::Justification::centredRight, false);
+    }
 }
 
 void ModulePanel::resized()
@@ -516,8 +433,8 @@ void ModulePanel::resized()
     if (! autoLayout)
         return;
 
-    auto area = getLocalBounds().reduced (6, 4);
-    area.removeFromTop (16); // header
+    auto area = getLocalBounds().reduced (12, 8);
+    area.removeFromTop (24); // header
 
     const int n = controls.size();
     if (n == 0)
@@ -617,26 +534,14 @@ void SectionSelector::paint (juce::Graphics& g)
         const bool isHover = (i == hover);
         const auto accent = sectionAccent (sections[i]);
 
+        g.setColour (isActive ? panelRaised : (isHover ? panel : chassis));
+        g.fillRoundedRectangle (r, 3.0f);
+        g.setColour (isActive ? border.brighter (0.15f) : border);
+        g.drawRoundedRectangle (r.reduced (0.5f), 3.0f, 1.0f);
         if (isActive)
         {
-            drawInsetWell (g, r, sc (3.0f), 1.0f);
-            g.setColour (accent.withAlpha (0.18f));
-            g.fillRoundedRectangle (r.reduced (sc (1.5f)), sc (2.5f));
-        }
-        else
-        {
-            juce::ColourGradient key (panelRaised.brighter (0.10f), r.getX(), r.getY(),
-                                      panelSunken, r.getX(), r.getBottom(), false);
-            g.setGradientFill (key);
-            g.fillRoundedRectangle (r, sc (3.0f));
-            g.setColour (juce::Colours::white.withAlpha (0.08f));
-            g.drawLine (r.getX() + sc (3.0f), r.getY() + sc (1.0f),
-                        r.getRight() - sc (3.0f), r.getY() + sc (1.0f), sc (1.0f));
-            g.setColour (juce::Colours::black.withAlpha (0.45f));
-            g.drawLine (r.getX() + sc (3.0f), r.getBottom() - sc (1.0f),
-                        r.getRight() - sc (3.0f), r.getBottom() - sc (1.0f), sc (1.4f));
-            g.setColour (isHover ? border.brighter (0.25f) : border);
-            g.drawRoundedRectangle (r.reduced (0.5f), sc (3.0f), sc (1.0f));
+            g.setColour (accent);
+            g.fillRect (r.getX() + 3.0f, r.getBottom() - 2.0f, r.getWidth() - 6.0f, 1.5f);
         }
 
         // Annunciator lamp.
@@ -731,6 +636,7 @@ void EnvelopePanel::paint (juce::Graphics& g)
     drawInsetWell (g, curveArea.toFloat(), sc (3.0f), 0.9f);
 
     auto a = curveArea.toFloat().reduced (10.0f, 8.0f);
+    drawAnalyzerGrid (g, a);
     const float x0 = a.getX();
     const float x1 = a.getRight();
     const float base = a.getBottom();
@@ -750,7 +656,7 @@ void EnvelopePanel::paint (juce::Graphics& g)
     p.lineTo (rx, base);
 
     g.setColour (accent.withAlpha (0.85f));
-    g.strokePath (p, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved));
+    g.strokePath (p, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved));
 }
 
 void EnvelopePanel::resized()
@@ -759,7 +665,7 @@ void EnvelopePanel::resized()
 
     if (r.getHeight() > 90)
     {
-        curveArea = r.removeFromTop (juce::jmax (46, r.getHeight() * 42 / 100));
+        curveArea = r.removeFromTop (juce::jlimit (46, 180, r.getHeight() * 42 / 100));
         r.removeFromTop (2);
     }
     else
@@ -807,7 +713,9 @@ void FilterResponseGraph::paint (juce::Graphics& g)
     g.drawText ("RESPONSE", getLocalBounds().reduced (8, 4).removeFromTop (10),
                 juce::Justification::topLeft);
 
-    auto a = area.reduced (9.0f, 9.0f);
+    auto a = area.reduced (12.0f, 12.0f);
+    a.removeFromTop (12.0f);
+    drawAnalyzerGrid (g, a);
 
     const double fc = PRA32ValueFormatter::cutoffHz ((int) std::lround (cutoffValue));
     const double q = juce::jmax (0.7, PRA32ValueFormatter::resonanceQ ((int) std::lround (resoValue)));
@@ -838,7 +746,7 @@ void FilterResponseGraph::paint (juce::Graphics& g)
     }
 
     g.setColour (accent.withAlpha (0.85f));
-    g.strokePath (curve, juce::PathStrokeType (2.0f, juce::PathStrokeType::curved));
+    g.strokePath (curve, juce::PathStrokeType (1.5f, juce::PathStrokeType::curved));
 
     g.setColour (separator);
     g.drawLine (a.getX(), base, a.getRight(), base, 1.0f);
@@ -968,17 +876,12 @@ void ValueReadout::paint (juce::Graphics& g)
 
     g.setFont (legendFont());
     g.setColour (secondaryColour);
-    g.drawFittedText (secondary, r, justification, 1);
+    g.drawFittedText (secondary + (modified ? "  /  MODIFIED" : ""), r, justification, 1);
 
     if (modified)
     {
-        const float d = sc (5.0f);
-        auto dot = juce::Rectangle<float> (d, d)
-                       .withCentre ({ (float) getWidth() - sc (7.0f), (float) getHeight() - sc (7.0f) });
         g.setColour (amber);
-        g.fillEllipse (dot);
-        g.setColour (engraveShadow.withAlpha (0.6f));
-        g.drawEllipse (dot, 0.8f);
+        g.fillRect ((float) getWidth() - 3.0f, 3.0f, 2.0f, (float) getHeight() - 6.0f);
     }
 }
 

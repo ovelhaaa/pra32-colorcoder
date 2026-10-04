@@ -12,20 +12,20 @@ namespace PRA32Theme
     // -------------------------------------------------------------------------
     inline const juce::Colour chassis      { 0xff101214 };
     inline const juce::Colour chassisEdge  { 0xff0a0b0c };
-    inline const juce::Colour panel        { 0xff181a1d };
+    inline const juce::Colour panel        { 0xff1b1e20 };
     inline const juce::Colour panelRaised  { 0xff202327 };
     inline const juce::Colour panelSunken  { 0xff131518 };
     inline const juce::Colour separator    { 0xff34383c };
     inline const juce::Colour border       { 0xff2b2f33 };
-    inline const juce::Colour bevelLight   { 0x14ffffff };
+    inline const juce::Colour bevelLight   { 0x0affffff };
     inline const juce::Colour bevelDark    { 0x40000000 };
 
     // -------------------------------------------------------------------------
     // Text / state
     // -------------------------------------------------------------------------
     inline const juce::Colour textPrimary  { 0xffe7e0d1 };
-    inline const juce::Colour textSecondary{ 0xff9a948a };
-    inline const juce::Colour textDim      { 0xff6a655d };
+    inline const juce::Colour textSecondary{ 0xffaba99f };
+    inline const juce::Colour textDim      { 0xff85877f };
     inline const juce::Colour amber        { 0xffd99a3f };
     inline const juce::Colour amberBright  { 0xffe8a020 };
     inline const juce::Colour warningRed   { 0xffb84b40 };
@@ -63,7 +63,7 @@ namespace PRA32Theme
     // -------------------------------------------------------------------------
     // Metrics
     // -------------------------------------------------------------------------
-    inline constexpr int   headerHeight      = 54;
+    inline constexpr int   headerHeight      = 80;
     inline constexpr int   sectionBarHeight  = 36;
     inline constexpr int   keyboardHeight    = 72;
     inline constexpr int   minWidth          = 760;
@@ -80,6 +80,7 @@ namespace PRA32Theme
     // -------------------------------------------------------------------------
     // Typography
     // -------------------------------------------------------------------------
+    juce::Font instrumentFont (float height, bool bold = false, float tracking = 0.0f);
     juce::Font brandFont();
     juce::Font subBrandFont();
     juce::Font moduleFont();
@@ -100,6 +101,7 @@ namespace PRA32Theme
     // -------------------------------------------------------------------------
     // Material helpers (all vector, top-left light source).
     // -------------------------------------------------------------------------
+    void drawAnalyzerGrid (juce::Graphics&, juce::Rectangle<float>);
     void drawBrushedPanel (juce::Graphics&, juce::Rectangle<float> bounds,
                            juce::Colour base, bool vertical);
     void drawRaisedPlate  (juce::Graphics&, juce::Rectangle<float> bounds, float corner);

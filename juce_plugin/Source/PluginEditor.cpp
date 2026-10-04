@@ -195,7 +195,7 @@ void PRA32ParameterPage::buildMod()
         selector->setGridColumns (3);
 
     if (auto* selector = dynamic_cast<SteppedSelector*> (find ("lfoOscDst")))
-        selector->setGridColumns (3);
+        selector->setGridColumns (2);
 }
 
 void PRA32ParameterPage::buildFx()
@@ -219,7 +219,7 @@ void PRA32ParameterPage::buildCharacter()
     addToPanel (voice, { "portaMode", "voiceAsgnMode", "bthAmpMod" });
 
     if (auto* selector = dynamic_cast<SteppedSelector*> (find ("portaMode")))
-        selector->setGridColumns (3);
+        selector->setGridColumns (1);
     if (auto* selector = dynamic_cast<SteppedSelector*> (find ("voiceAsgnMode")))
         selector->setGridColumns (1);
     if (auto* selector = dynamic_cast<SteppedSelector*> (find ("bthAmpMod")))
@@ -238,11 +238,11 @@ void PRA32ParameterPage::buildCharacter()
     addToPanel (pitch, { "egOscAmt", "egOscDst" });
 
     if (auto* selector = dynamic_cast<SteppedSelector*> (find ("egOscDst")))
-        selector->setGridColumns (3);
+        selector->setGridColumns (2);
 
     auto& output = *addModule ("OUTPUT");
     addToPanel (output, { "pan", "ampGain", "ampExpnt" });
-    output.setPreferredColumns (3);
+    output.setAutoLayout (false);
 }
 
 //==============================================================================
@@ -271,7 +271,7 @@ void PRA32ParameterPage::layoutOsc (juce::Rectangle<int> area)
 {
     const int gap = 8;
 
-    const int topHeight = area.getHeight() * 68 / 100;
+    const int topHeight = area.getHeight() - gap - juce::jmax (120, area.getHeight() * 36 / 100);
     auto topArea = area.removeFromTop (topHeight);
     area.removeFromTop (gap);
     auto mixerArea = area;
@@ -287,10 +287,10 @@ void PRA32ParameterPage::layoutOsc (juce::Rectangle<int> area)
 
     // Layout OSCILLATOR 1 internally
     {
-        auto inner = juce::Rectangle<int> (osc1Area.getWidth(), osc1Area.getHeight()).reduced (6, 4);
-        inner.removeFromTop (16);
+        auto inner = juce::Rectangle<int> (osc1Area.getWidth(), osc1Area.getHeight()).reduced (12, 8);
+        inner.removeFromTop (24);
 
-        const int topRowH = inner.getHeight() * 44 / 100;
+        const int topRowH = inner.getHeight() * 40 / 100;
         auto topRow = inner.removeFromTop (topRowH);
         auto botRow = inner;
 
@@ -306,10 +306,10 @@ void PRA32ParameterPage::layoutOsc (juce::Rectangle<int> area)
 
     // Layout OSCILLATOR 2 internally
     {
-        auto inner = juce::Rectangle<int> (osc2Area.getWidth(), osc2Area.getHeight()).reduced (6, 4);
-        inner.removeFromTop (16);
+        auto inner = juce::Rectangle<int> (osc2Area.getWidth(), osc2Area.getHeight()).reduced (12, 8);
+        inner.removeFromTop (24);
 
-        const int topRowH = inner.getHeight() * 44 / 100;
+        const int topRowH = inner.getHeight() * 40 / 100;
         auto topRow = inner.removeFromTop (topRowH);
         auto botRow = inner;
 
@@ -324,8 +324,8 @@ void PRA32ParameterPage::layoutOsc (juce::Rectangle<int> area)
 
     // Layout MIXER internally
     {
-        auto inner = juce::Rectangle<int> (mixerArea.getWidth(), mixerArea.getHeight()).reduced (6, 4);
-        inner.removeFromTop (16);
+        auto inner = juce::Rectangle<int> (mixerArea.getWidth(), mixerArea.getHeight()).reduced (12, 8);
+        inner.removeFromTop (24);
 
         const int knobW = inner.getWidth() / 2;
         if (auto* c = find ("oscMix")) c->setBounds (inner.removeFromLeft (knobW).reduced (12, 4));
@@ -347,8 +347,8 @@ void PRA32ParameterPage::layoutFilter (juce::Rectangle<int> area)
     // Children of the FILTER NETWORK panel use panel-local coordinates.
     {
         auto inner = juce::Rectangle<int> (filterBounds.getWidth(), filterBounds.getHeight())
-                         .reduced (6, 4);
-        inner.removeFromTop (16);
+                         .reduced (12, 8);
+        inner.removeFromTop (24);
 
         auto topRow = inner.removeFromTop (juce::jmin (inner.getHeight() * 52 / 100, 200));
         const int half = topRow.getWidth() / 2;
@@ -362,14 +362,15 @@ void PRA32ParameterPage::layoutFilter (juce::Rectangle<int> area)
         inner.removeFromTop (6);
 
         if (graphs.size() > 0)
-            graphs[0]->setBounds (inner.reduced (6, 0));
+            graphs[0]->setBounds (inner.reduced (6, 0).withSizeKeepingCentre (
+                inner.getWidth() - 12, juce::jmin (240, inner.getHeight())));
     }
 
     // Children of the FILTER SHAPING panel
     {
         auto inner = juce::Rectangle<int> (shapingBounds.getWidth(), shapingBounds.getHeight())
-                         .reduced (6, 4);
-        inner.removeFromTop (16);
+                         .reduced (12, 8);
+        inner.removeFromTop (24);
 
         auto row1 = inner.removeFromTop (inner.getHeight() * 40 / 100);
         const int wMode = row1.getWidth() * 46 / 100;
@@ -401,8 +402,8 @@ void PRA32ParameterPage::layoutEnvs (juce::Rectangle<int> area)
     {
         if (env == nullptr) return;
         auto inner = juce::Rectangle<int> (moduleBounds.getWidth(), moduleBounds.getHeight())
-                         .reduced (6, 4);
-        inner.removeFromTop (16);
+                         .reduced (12, 8);
+        inner.removeFromTop (24);
         env->setBounds (inner.reduced (4));
     };
 
@@ -415,8 +416,8 @@ void PRA32ParameterPage::layoutMod (juce::Rectangle<int> area)
     if (auto* m = pageModule (moduleById, "MODULATION LFO"))
         m->setBounds (area);
 
-    auto inner = juce::Rectangle<int> (area.getWidth(), area.getHeight()).reduced (6, 4);
-    inner.removeFromTop (16);
+    auto inner = juce::Rectangle<int> (area.getWidth(), area.getHeight()).reduced (12, 8);
+    inner.removeFromTop (24);
 
     const int halfH = inner.getHeight() / 2;
     auto topRow = inner.removeFromTop (halfH);
@@ -449,18 +450,18 @@ void PRA32ParameterPage::layoutFx (juce::Rectangle<int> area)
     if (auto* m = pageModule (moduleById, "CHORUS")) m->setBounds (chorus);
     if (auto* m = pageModule (moduleById, "DELAY"))  m->setBounds (delay);
 
-    auto inner = juce::Rectangle<int> (delay.getWidth(), delay.getHeight()).reduced (6, 4);
-    inner.removeFromTop (16);
+    auto inner = juce::Rectangle<int> (delay.getWidth(), delay.getHeight()).reduced (12, 8);
+    inner.removeFromTop (24);
 
     const int halfH = inner.getHeight() / 2;
     auto topRow = inner.removeFromTop (halfH);
     auto botRow = inner;
 
     const int halfW = topRow.getWidth() / 2;
-    if (auto* c = find ("delayTime"))     c->setBounds (topRow.removeFromLeft (halfW).reduced (6, 4));
+    if (auto* c = find ("delayTime"))     c->setBounds (topRow.removeFromLeft (halfW).reduced (12, 8));
     if (auto* c = find ("delayMode"))     c->setBounds (topRow.reduced (16, 20));
-    if (auto* c = find ("delayDepth"))    c->setBounds (botRow.removeFromLeft (halfW).reduced (6, 4));
-    if (auto* c = find ("delayFeedback")) c->setBounds (botRow.reduced (6, 4));
+    if (auto* c = find ("delayDepth"))    c->setBounds (botRow.removeFromLeft (halfW).reduced (12, 8));
+    if (auto* c = find ("delayFeedback")) c->setBounds (botRow.reduced (12, 8));
 }
 
 void PRA32ParameterPage::layoutCharacter (juce::Rectangle<int> area)
@@ -483,8 +484,8 @@ void PRA32ParameterPage::layoutCharacter (juce::Rectangle<int> area)
 
     // Layout VOICE internally
     {
-        auto inner = juce::Rectangle<int> (voiceBounds.getWidth(), voiceBounds.getHeight()).reduced (6, 4);
-        inner.removeFromTop (16);
+        auto inner = juce::Rectangle<int> (voiceBounds.getWidth(), voiceBounds.getHeight()).reduced (12, 8);
+        inner.removeFromTop (24);
 
         const int wTotal = inner.getWidth();
         const int wPorta = wTotal * 44 / 100;
@@ -514,10 +515,21 @@ void PRA32ParameterPage::layoutCharacter (juce::Rectangle<int> area)
     if (auto* m = pageModule (moduleById, "PITCH MODULATION")) m->setBounds (pitchBounds);
     if (auto* m = pageModule (moduleById, "OUTPUT"))           m->setBounds (outBounds);
 
+    // The output toggle gets its own compact row, keeping knob labels clear.
+    {
+        auto inner = juce::Rectangle<int> (outBounds.getWidth(), outBounds.getHeight()).reduced (12, 8);
+        inner.removeFromTop (24);
+        auto toggle = inner.removeFromBottom (26);
+        const int half = inner.getWidth() / 2;
+        if (auto* c = find ("pan")) c->setBounds (inner.removeFromLeft (half));
+        if (auto* c = find ("ampGain")) c->setBounds (inner);
+        if (auto* c = find ("ampExpnt")) c->setBounds (toggle.reduced (8, 2));
+    }
+
     // Layout PITCH MODULATION internally
     {
-        auto inner = juce::Rectangle<int> (pitchBounds.getWidth(), pitchBounds.getHeight()).reduced (6, 4);
-        inner.removeFromTop (16);
+        auto inner = juce::Rectangle<int> (pitchBounds.getWidth(), pitchBounds.getHeight()).reduced (12, 8);
+        inner.removeFromTop (24);
 
         const int knobW = inner.getWidth() * 42 / 100;
         if (auto* c = find ("egOscAmt")) c->setBounds (inner.removeFromLeft (knobW).reduced (4, 4));
@@ -529,14 +541,6 @@ void PRA32ParameterPage::resized()
 {
     auto area = getLocalBounds();
 
-    // Narrow windows reflow every section into a legible vertical stack rather
-    // than shrinking controls until labels collide.
-    if (area.getWidth() < 760)
-    {
-        layoutStack (area, 8);
-        return;
-    }
-
     if (section == "OSC")              layoutOsc (area);
     else if (section == "FILTER")      layoutFilter (area);
     else if (section == "ENVS")        layoutEnvs (area);
@@ -545,6 +549,15 @@ void PRA32ParameterPage::resized()
     else if (section == "CHARACTER"
           || section == "COLOR")       layoutCharacter (area);
     else                               layoutStack (area, 8);
+
+    // Mode keys stay compact as the host window grows; hit bounds match paint.
+    for (auto* control : controls)
+        if (dynamic_cast<SteppedSelector*> (control) != nullptr)
+        {
+            const auto bounds = control->getBounds();
+            control->setBounds (bounds.withSizeKeepingCentre (
+                juce::jmin (360, bounds.getWidth()), juce::jmin (152, bounds.getHeight())));
+        }
 }
 
 //==============================================================================
@@ -818,46 +831,20 @@ void PRA32ColorcoderAudioProcessorEditor::paint (juce::Graphics& g)
     g.setColour (juce::Colours::white.withAlpha (0.05f));
     g.drawLine (0.0f, (float) header.getBottom() - 1.0f, w, (float) header.getBottom() - 1.0f, 1.0f);
 
-    // Serigraphed brand plate for Tonecoder TC-32.
-    const float brandLeft = railW + sc (8.0f);
-    const float brandTopY = sc (6.0f);
-    const float brandH    = (float) headerHeight - sc (12.0f);
-    const float brandW    = sc (290.0f);
-    auto brandArea = juce::Rectangle<float> (brandLeft, brandTopY, brandW, brandH);
-
-    // Discrete signal/power status lamp
-    const float lampSize = sc (9.0f);
-    auto lampBox = brandArea.removeFromLeft (lampSize + sc (8.0f))
-                            .withSizeKeepingCentre (lampSize, lampSize);
-    drawLamp (g, lampBox, amberBright, 0.85f, sc (2.5f));
-
-    auto brandUpper = brandArea.removeFromTop (brandArea.getHeight() * 0.54f);
-    auto brandLower = brandArea;
-
-    // Model inscription "TC-32"
-    const float modelTextW = sc (52.0f);
-    auto modelRect = brandUpper.removeFromLeft (modelTextW);
-    drawEngravedText (g, "TC-32", modelRect,
-                      juce::Font (juce::FontOptions (16.0f).withStyle ("Bold")),
-                      juce::Justification::centredLeft, amberBright,
-                      engraveShadow.withAlpha (0.8f));
-
-    // Divider dot
-    g.setColour (textDim.withAlpha (0.8f));
-    const float dotX = modelRect.getRight() + sc (2.0f);
-    const float dotY = brandUpper.getCentreY();
-    g.fillEllipse (dotX, dotY - sc (1.5f), sc (3.0f), sc (3.0f));
-
-    // Brand inscription "T O N E C O D E R"
-    brandUpper.removeFromLeft (sc (9.0f));
-    drawEngravedText (g, "T O N E C O D E R", brandUpper,
-                      brandFont(), juce::Justification::centredLeft, textPrimary,
-                      engraveShadow.withAlpha (0.85f));
-
-    // Secondary technical inscription "FOUR-VOICE POLYPHONIC SIGNAL SYNTHESIZER"
-    drawEngravedText (g, "FOUR-VOICE POLYPHONIC SIGNAL SYNTHESIZER", brandLower,
-                      subBrandFont(), juce::Justification::centredLeft, textSecondary,
-                      engraveShadow.withAlpha (0.7f));
+    // Product inscription and model badge share the header layout reservation.
+    auto brand = juce::Rectangle<int> (18, 17, 252, 46);
+    auto upper = brand.removeFromTop (29);
+    g.setFont (brandFont());
+    g.setColour (textPrimary);
+    g.drawText ("TONECODER", upper.removeFromLeft (174), juce::Justification::centredLeft, false);
+    g.setColour (border);
+    g.drawRoundedRectangle (upper.toFloat().reduced (2.0f, 4.0f), 2.0f, 1.0f);
+    g.setFont (instrumentFont (15.0f, true));
+    g.setColour (textPrimary);
+    g.drawText ("TC-32", upper, juce::Justification::centred, false);
+    g.setFont (subBrandFont());
+    g.setColour (textSecondary);
+    g.drawText ("POLYPHONIC SIGNAL SYNTHESIZER", brand, juce::Justification::centredLeft, false);
 
     // Keyboard rack plate.
     if (keyboardVisible && ! keyboardFrame.isEmpty())
@@ -886,48 +873,29 @@ void PRA32ColorcoderAudioProcessorEditor::resized()
 
     const int rail   = juce::jmax (14, juce::roundToInt (sc (14.0f)));
     const int margin = rail + juce::roundToInt (sc (4.0f));
-    const int gap    = juce::roundToInt (sc (8.0f));
 
     auto r = getLocalBounds();
 
     // ---- Header -------------------------------------------------------------
-    auto header = r.removeFromTop (headerHeight).reduced (margin, juce::roundToInt (sc (9.0f)));
-
-    const bool compact = getWidth() < 860;
-    const int utilityW = juce::roundToInt (sc (compact ? 66.0f : 80.0f));
-    const int keysW    = juce::roundToInt (sc (compact ? 48.0f : 54.0f));
-    auto utility = header.removeFromRight (utilityW * 3 + keysW + gap * 3);
-    keyboardButton.setBounds (utility.removeFromRight (keysW));
-    utility.removeFromRight (gap);
-    saveButton.setBounds (utility.removeFromRight (utilityW));
-    utility.removeFromRight (gap);
-    loadButton.setBounds (utility.removeFromRight (utilityW));
-    utility.removeFromRight (gap);
-    initButton.setBounds (utility.removeFromRight (utilityW));
-
-    // Brand reservation on left
-    const int brandReservedW = juce::roundToInt (sc (compact ? 240.0f : 295.0f));
-    header.removeFromLeft (brandReservedW + gap);
-
-    // Preset group centered in remaining area
-    const int presetGroupW = juce::jmin (juce::roundToInt (sc (340.0f)), header.getWidth());
-    auto presetGroup = header.withSizeKeepingCentre (presetGroupW, header.getHeight());
-    const int arrowW = juce::roundToInt (sc (28.0f));
-    presetPrevButton.setBounds (presetGroup.removeFromLeft (arrowW));
-    presetNextButton.setBounds (presetGroup.removeFromRight (arrowW));
-    presetDisplay.setBounds (presetGroup.reduced (juce::roundToInt (sc (4.0f)),
-                                                 juce::roundToInt (sc (1.0f))));
-
-    // ---- Section bar --------------------------------------------------------
-    sectionSelector.setBounds (r.removeFromTop (sectionBarHeight).reduced (margin,
-                                                                           juce::roundToInt (sc (3.0f))));
+    auto header = r.removeFromTop (headerHeight).reduced (18, 8);
+    header.removeFromLeft (264);
+    auto preset = header.removeFromTop (36);
+    const int arrowW = 24;
+    presetPrevButton.setBounds (preset.removeFromLeft (arrowW).reduced (0, 3));
+    presetNextButton.setBounds (preset.removeFromRight (arrowW).reduced (0, 3));
+    presetDisplay.setBounds (preset.reduced (5, 0));
+    header.removeFromTop (4);
+    auto utility = header.removeFromRight (268);
+    keyboardButton.setBounds (utility.removeFromRight (42).reduced (2, 0));
+    saveButton.setBounds (utility.removeFromRight (80).reduced (2, 0));
+    loadButton.setBounds (utility.removeFromRight (80).reduced (2, 0));
+    initButton.setBounds (utility.reduced (2, 0));
+    sectionSelector.setBounds (r.removeFromTop (sectionBarHeight).reduced (margin, 3));
 
     // ---- Keyboard -----------------------------------------------------------
     if (keyboardVisible)
     {
-        const int keyboardH = juce::jlimit (juce::roundToInt (sc (52.0f)),
-                                            keyboardHeight,
-                                            juce::jmax (juce::roundToInt (sc (52.0f)), getHeight() / 8));
+        const int keyboardH = juce::jlimit (56, 116, getHeight() / 8);
 
         keyboardFrame = r.removeFromBottom (keyboardH).reduced (margin, juce::roundToInt (sc (5.0f)));
 

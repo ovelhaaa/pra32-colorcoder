@@ -28,6 +28,10 @@ juce_add_plugin(PRA32ColorcoderPlugin
 # Generate JuceHeader.h
 juce_generate_juce_header(PRA32ColorcoderPlugin)
 
+# Embedded family typography: no dependency on installed system fonts.
+juce_add_binary_data(TC32FontData HEADER_NAME TC32FontData.h NAMESPACE TC32FontData
+    SOURCES Resources/Fonts/Montserrat-Regular.ttf Resources/Fonts/Montserrat-Bold.ttf)
+
 # Source files
 target_sources(PRA32ColorcoderPlugin PRIVATE
     Source/PluginProcessor.cpp
@@ -57,6 +61,7 @@ target_include_directories(PRA32ColorcoderPlugin PRIVATE
 
 # Link to JUCE modules
 target_link_libraries(PRA32ColorcoderPlugin PRIVATE
+    TC32FontData
     juce::juce_audio_utils
     juce::juce_audio_processors
     PUBLIC

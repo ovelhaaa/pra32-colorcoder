@@ -4,6 +4,7 @@ using namespace PRA32Theme;
 
 PRA32LookAndFeel::PRA32LookAndFeel()
 {
+    setDefaultSansSerifTypeface (instrumentFont (12.0f).getTypefacePtr());
     setColour (juce::ResizableWindow::backgroundColourId, chassis);
     setColour (juce::Slider::textBoxTextColourId,        textPrimary);
     setColour (juce::Slider::textBoxBackgroundColourId,  panelSunken);

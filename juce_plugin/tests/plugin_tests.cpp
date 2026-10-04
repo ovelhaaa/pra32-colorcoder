@@ -991,6 +991,24 @@ void testUiCoverageAndLifecycle()
         juce::ignoreUnused (sections);
         p.loadPreset (0);
     }
+    // Full editor layout at supported corners, including unusual aspect ratios.
+    for (const auto size : { juce::Point<int> (760, 500), juce::Point<int> (960, 620),
+                             juce::Point<int> (1600, 1000), juce::Point<int> (1600, 500),
+                             juce::Point<int> (760, 1000) })
+    {
+        std::unique_ptr<juce::AudioProcessorEditor> editor (p.createEditor());
+        editor->setSize (size.x, size.y);
+        CHECK (PRA32Theme::labelFont().getTypefacePtr()->getName() == "Montserrat");
+        for (const auto& pd : SynthParameters::getParameters())
+        {
+            auto* c = findControl (*editor, pd.id);
+            CHECK (c != nullptr);
+            if (c == nullptr) continue;
+            CHECK (c->getWidth() >= 36 && c->getHeight() >= 20);
+            CHECK (c->getParentComponent()->getLocalBounds().contains (c->getBounds()));
+        }
+    }
+
     // Actual active-page layout, including envelope knobs owned by EnvelopePanel.
     for (const auto* section : sections)
     {
@@ -1261,10 +1279,39 @@ void testTransportStopRecovery()
 
 } // namespace
 
-int main()
+int main (int argc, char** argv)
 {
     std::setvbuf (stdout, nullptr, _IONBF, 0);
     juce::ScopedJuceInitialiser_GUI juceInit;
+
+    // Optional visual audit renders the shipping editor, without audio hardware.
+    if (argc == 3 && juce::String (argv[1]) == "--capture-ui")
+    {
+        const juce::File output = juce::File::getCurrentWorkingDirectory().getChildFile (argv[2]);
+        output.createDirectory();
+        const char* sections[] = { "OSC", "FILTER", "ENVS", "MOD", "FX", "CHARACTER" };
+        const int widths[] = { 960, 760, 1600 };
+        const int heights[] = { 620, 500, 1000 };
+        for (int size = 0; size < 3; ++size)
+            for (int page = 0; page < 6; ++page)
+            {
+                PRA32ColorcoderAudioProcessor processor;
+                processor.setUiProperty ("uiSection", page);
+                std::unique_ptr<juce::AudioProcessorEditor> editor (processor.createEditor());
+                editor->setSize (widths[size], heights[size]);
+                editor->setVisible (true);
+                auto image = editor->createComponentSnapshot (editor->getLocalBounds(), true, 1.0f);
+                const auto file = output.getChildFile (juce::String (sections[page]) + "-"
+                                                         + juce::String (widths[size]) + ".png");
+                auto stream = file.createOutputStream();
+                juce::PNGImageFormat png;
+                if (stream == nullptr) return 1;
+                stream->setPosition (0);
+                stream->truncate();
+                if (! png.writeImageToStream (image, *stream)) return 1;
+            }
+        return 0;
+    }
 
     std::printf ("== PRA32-U2 plugin (JUCE) tests ==\n");
 

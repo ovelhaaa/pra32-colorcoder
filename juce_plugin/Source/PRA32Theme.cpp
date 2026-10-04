@@ -1,6 +1,7 @@
 #include "PRA32Theme.h"
 
 #include <cmath>
+#include <TC32FontData.h>
 
 namespace PRA32Theme
 {
@@ -9,55 +10,32 @@ juce::Colour sectionAccent (const juce::String& section)
 {
     if (section == "OSC")       return juce::Colour (0xffd99a3f); // amber
     if (section == "FILTER")    return juce::Colour (0xff5eb7b0); // cyan / teal
-    if (section == "ENVS")      return juce::Colour (0xffa8b56a); // olive
+    if (section == "ENVS")      return juce::Colour (0xffd7af66); // envelope amber
     if (section == "MOD")       return juce::Colour (0xff7f9fd0); // steel blue
-    if (section == "FX")        return juce::Colour (0xffc98b6a); // copper
+    if (section == "FX")        return juce::Colour (0xffa399c7); // violet
     if (section == "CHARACTER"
-     || section == "COLOR")     return juce::Colour (0xffb07fb0); // mauve
+     || section == "COLOR")     return juce::Colour (0xffc58a80); // muted red
     return amber;
 }
 
-juce::Font brandFont()
+juce::Font instrumentFont (float height, bool bold, float tracking)
 {
-    return juce::Font (juce::FontOptions (20.0f).withStyle ("Bold"));
+    static const auto regular = juce::Typeface::createSystemTypefaceFor (
+        TC32FontData::MontserratRegular_ttf, TC32FontData::MontserratRegular_ttfSize);
+    static const auto strong = juce::Typeface::createSystemTypefaceFor (
+        TC32FontData::MontserratBold_ttf, TC32FontData::MontserratBold_ttfSize);
+    return juce::Font (juce::FontOptions (bold ? strong : regular))
+        .withHeight (height).withExtraKerningFactor (tracking);
 }
 
-juce::Font subBrandFont()
-{
-    return juce::Font (juce::FontOptions (8.5f).withStyle ("Bold"));
-}
-
-juce::Font moduleFont()
-{
-    return juce::Font (juce::FontOptions (13.0f).withStyle ("Bold"));
-}
-
-juce::Font sectionFont()
-{
-    return juce::Font (juce::FontOptions (12.0f).withStyle ("Bold"));
-}
-
-juce::Font labelFont()
-{
-    return juce::Font (juce::FontOptions (10.5f));
-}
-
-juce::Font legendFont()
-{
-    return juce::Font (juce::FontOptions (9.0f));
-}
-
-juce::Font valueFont()
-{
-    return juce::Font (juce::FontOptions (11.0f)
-                           .withName (juce::Font::getDefaultMonospacedFontName()));
-}
-
-juce::Font presetFont()
-{
-    return juce::Font (juce::FontOptions (14.0f)
-                           .withName (juce::Font::getDefaultMonospacedFontName()));
-}
+juce::Font brandFont()    { return instrumentFont (22.0f, true, 0.06f); }
+juce::Font subBrandFont() { return instrumentFont (8.5f, false, 0.08f); }
+juce::Font moduleFont()   { return instrumentFont (12.0f, true, 0.06f); }
+juce::Font sectionFont()  { return instrumentFont (12.0f, true, 0.04f); }
+juce::Font labelFont()    { return instrumentFont (11.5f, false, 0.015f); }
+juce::Font legendFont()   { return instrumentFont (9.0f, false, 0.025f); }
+juce::Font valueFont()    { return instrumentFont (12.0f, true, 0.0f); }
+juce::Font presetFont()   { return instrumentFont (13.0f, true, 0.0f); }
 
 //==============================================================================
 namespace
@@ -80,54 +58,38 @@ float uiScale()
 }
 
 //==============================================================================
+void drawAnalyzerGrid (juce::Graphics& g, juce::Rectangle<float> bounds)
+{
+    g.setColour (separator.withAlpha (0.45f));
+    for (int i = 0; i <= 8; ++i)
+    {
+        const float x = bounds.getX() + bounds.getWidth() * (float) i / 8.0f;
+        g.drawLine (x, bounds.getY(), x, bounds.getBottom(), 0.6f);
+    }
+    for (int i = 0; i <= 4; ++i)
+    {
+        const float y = bounds.getY() + bounds.getHeight() * (float) i / 4.0f;
+        g.drawLine (bounds.getX(), y, bounds.getRight(), y, 0.6f);
+    }
+}
+
 void drawBrushedPanel (juce::Graphics& g, juce::Rectangle<float> bounds,
                        juce::Colour base, bool vertical)
 {
-    juce::ColourGradient grad (base.brighter (0.06f),
-                               vertical ? bounds.getCentreX() : bounds.getX(),
-                               vertical ? bounds.getY() : bounds.getCentreY(),
-                               base.darker (0.16f),
-                               vertical ? bounds.getCentreX() : bounds.getRight(),
-                               vertical ? bounds.getBottom() : bounds.getCentreY(),
-                               false);
-    g.setGradientFill (grad);
+    juce::ignoreUnused (vertical);
+    g.setColour (base);
     g.fillRect (bounds);
-
-    const int n = vertical ? (int) bounds.getWidth() : (int) bounds.getHeight();
-
-    for (int i = 0; i < n; ++i)
-    {
-        const float k = (float) i;
-        const float noise = std::sin (k * 12.9898f + 4.1414f) * 43758.5453f;
-        const float f = (noise - std::floor (noise)) - 0.5f;
-
-        g.setColour (f > 0.0f ? juce::Colours::white.withAlpha (0.014f)
-                              : juce::Colours::black.withAlpha (0.02f));
-
-        if (vertical)
-            g.drawVerticalLine ((int) bounds.getX() + i, bounds.getY(), bounds.getBottom());
-        else
-            g.drawHorizontalLine ((int) bounds.getY() + i, bounds.getX(), bounds.getRight());
-    }
 }
 
 void drawRaisedPlate (juce::Graphics& g, juce::Rectangle<float> bounds, float corner)
 {
-    juce::ColourGradient grad (panelRaised.brighter (0.10f), bounds.getX(), bounds.getY(),
-                               panelRaised.darker (0.30f), bounds.getRight(), bounds.getBottom(), false);
-    g.setGradientFill (grad);
+    g.setColour (panel);
     g.fillRoundedRectangle (bounds, corner);
-
-    g.setColour (juce::Colours::white.withAlpha (0.07f));
-    g.drawLine (bounds.getX() + corner, bounds.getY() + 0.8f,
-                bounds.getRight() - corner, bounds.getY() + 0.8f, 1.0f);
-
-    g.setColour (engraveShadow.withAlpha (0.55f));
-    g.drawLine (bounds.getX() + corner, bounds.getBottom() - 0.8f,
-                bounds.getRight() - corner, bounds.getBottom() - 0.8f, 1.6f);
-
-    g.setColour (border.brighter (0.05f));
+    g.setColour (border);
     g.drawRoundedRectangle (bounds.reduced (0.5f), corner, 1.0f);
+    g.setColour (bevelLight);
+    g.drawLine (bounds.getX() + corner, bounds.getY() + 1.0f,
+                bounds.getRight() - corner, bounds.getY() + 1.0f, 1.0f);
 }
 
 void drawInsetWell (juce::Graphics& g, juce::Rectangle<float> bounds, float corner, float depth)
@@ -199,7 +161,7 @@ void drawLamp (juce::Graphics& g, juce::Rectangle<float> area, juce::Colour colo
         const auto lit = colour.withMultipliedBrightness (0.7f + 0.5f * amount);
 
         g.setColour (lit.withAlpha (0.25f * amount));
-        g.fillRoundedRectangle (glass.expanded (2.0f), corner + 1.5f);
+        g.fillRoundedRectangle (glass, corner);
 
         g.setColour (lit.withAlpha (0.35f + 0.65f * amount));
         g.fillRoundedRectangle (glass, juce::jmax (1.0f, corner - 0.5f));
